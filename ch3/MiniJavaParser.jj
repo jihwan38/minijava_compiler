@@ -206,3 +206,51 @@ void AndExpression() :
 {
     CompareExpression() ( <AND> CompareExpression() )*
 }
+
+void Block() :
+{}
+{
+    <LBRACE> ( Statement() )* <RBRACE>
+}
+
+void Statement() :
+{}
+{
+      Block()
+    | LOOKAHEAD(2) AssignmentStatement()
+    | LOOKAHEAD(2) ArrayAssignmentStatement()
+    | IfStatement()
+    | WhileStatement()
+    | PrintStatement()
+}
+
+void PrintStatement() :
+{}
+{
+    <PRINTLN> <LPAREN> Expression() <RPAREN> <SEMI>
+}
+
+void WhileStatement() :
+{}
+{
+    <WHILE> <LPAREN> Expression() <RPAREN> Statement()
+}
+
+void IfStatement() :
+{}
+{
+    <IF> <LPAREN> Expression() <RPAREN> Statement() <ELSE> Statement()
+}
+
+void ArrayAssignmentStatement() :
+{}
+{
+    Identifier() <LBRACK> Expression() <RBRACK> <ASSIGN> Expression() <SEMI>
+}
+
+void AssignmentStatement() :
+{}
+{
+    Identifier() <ASSIGN> Expression() <SEMI>
+}
+
