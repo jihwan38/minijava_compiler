@@ -62,18 +62,36 @@ TOKEN : {
 
 }
 
-void Goal() :
+
+void Type() :
 {}
 {
-    ( MiniJavaToken() )* <EOF>
+      LOOKAHEAD(3) ArrayType()
+    | BooleanType()
+    | IntegerType()
+    | Identifier()
 }
 
-void MiniJavaToken() :
+void ArrayType() :
 {}
 {
-    <CLASS> | <PUBLIC>  | <STATIC>  | <VOID>        | <MAIN>    | <STRING>  | <EXTENDS> | <RETURN>
-|   <INT>   | <BOOLEAN> | <IF>      | <ELSE>        | <WHILE>   | <PRINTLN> | <LENGTH>  | <TRUE>
-|   <FALSE> | <THIS>    | <NEW>     | <LBRACE>      | <RBRACE>  | <LPAREN>  | <RPAREN>  | <LBRACK>
-|   <RBRACK>| <SEMI>    | <COMMA>   | <ASSIGN>      | <AND>     | <LT>      | <PLUS>    | <MINUS>
-|   <STAR>  | <DOT>     | <BANG>    | <IDENTIFIER>  | <INTEGER_LITERAL>
+    <INT> <LBRACK> <RBRACK>
+}
+
+void BooleanType() :
+{}
+{
+    <BOOLEAN>
+}
+
+void IntegerType() :
+{}
+{
+    <INT>
+}
+
+void Identifier() :
+{}
+{
+    <IDENTIFIER>
 }
