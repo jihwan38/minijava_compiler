@@ -62,6 +62,15 @@ TOKEN : {
 
 }
 
+void Type() :
+{}
+{
+      LOOKAHEAD(3) ArrayType()
+    | BooleanType()
+    | IntegerType()
+    | Identifier()
+}
+
 void ArrayType() :
 {}
 {
@@ -86,15 +95,19 @@ void Identifier() :
     <IDENTIFIER>
 }
 
-void Type() :
+
+void PrimaryExpression() : 
 {}
 {
-      LOOKAHEAD(3) ArrayType()
-    | BooleanType()
-    | IntegerType()
+      IntegerLiteral()
+    | TrueLiteral()
+    | FalseLiteral()
     | Identifier()
+    | ThisExpression()
+    | LOOKAHEAD(3) ArrayAllocationExpression()
+    | AllocationExpression()
+    | <LPAREN> Expression() <RPAREN>
 }
-
 
 void IntegerLiteral() : 
 {}
@@ -132,15 +145,32 @@ void AllocationExpression() :
     <NEW> <IDENTIFIER> <LPAREN> <RPAREN>
 }
 
-void PrimaryExpression() : 
+void PostfixExpression() :
 {}
 {
-      IntegerLiteral()
-    | TrueLiteral()
-    | FalseLiteral()
-    | Identifier()
-    | ThisExpression()
-    | LOOKAHEAD(3) ArrayAllocationExpression()
-    | AllocationExpression()
-    | "(" Expression() ")"
+    PrimaryExpression()
+
+    (
+          <LBRACK> Expression() <RBRACK>
+        | LOOKAHEAD(2) <DOT> <LENGTH>
+        | LOOKAHEAD( <DOT> Identifier() <LPAREN> ) <DOT> Identifier() <LPAREN> [ ExpressionList() ] <RPAREN>
+    )*
+}
+
+void Expression() : 
+{}
+{
+    PostfixExpression()
+}
+
+void ExpressionList() :
+{}
+{
+    Expression() ( ExpressionRest() )*
+}
+
+void ExpressionRest() : 
+{}
+{
+    <COMMA> Expression()
 }
