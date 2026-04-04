@@ -1,0 +1,331 @@
+options {
+    JAVA_UNICODE_ESCAPE = true;
+}
+
+PARSER_BEGIN(MiniJavaParser)
+
+public class MiniJavaParser {
+}
+PARSER_END(MiniJavaParser)
+
+SKIP : {
+    " "
+|   "\t"
+|   "\n"
+|   "\r"
+}
+
+SPECIAL_TOKEN : {
+    < SINGLE_LINE_COMMENT: "//" (~["\n","\r"])* ("\n"|"\r"|"\r\n") >
+
+|   < MULTI_LINE_COMMENT: "/*" (~["*"])* "*" ("*" | (~["*","/"] (~["*"])* "*"))* "/" >
+}
+
+TOKEN : {
+    < CLASS : "class" >
+|   < PUBLIC : "public" >
+|   < STATIC : "static" >
+|   < VOID : "void" >
+|   < MAIN : "main" >
+|   < STRING : "String" >
+|   < EXTENDS : "extends" >
+|   < RETURN : "return" >
+|   < INT : "int" >
+|   < BOOLEAN : "boolean" >
+|   < IF : "if" >
+|   < ELSE : "else" >
+|   < WHILE : "while" >
+|   < PRINTLN : "System.out.println" >
+|   < LENGTH : "length" >
+|   < TRUE : "true" >
+|   < FALSE : "false" >
+|   < THIS : "this" >
+|   < NEW : "new" >
+|   < LBRACE : "{" >
+|   < RBRACE : "}" >
+|   < LPAREN : "(" >
+|   < RPAREN : ")" >
+|   < LBRACK : "[" >
+|   < RBRACK : "]" >
+|   < SEMI : ";" >
+|   < COMMA : "," >
+|   < ASSIGN : "=" >
+|   < AND : "&&" >
+|   < LT : "<" >
+|   < PLUS : "+" >
+|   < MINUS : "-" >
+|   < STAR : "*" >
+|   < DOT : "." >
+|   < BANG : "!" >
+|   < IDENTIFIER : ["a"-"z", "A"-"Z"] ( ["a"-"z", "A"-"Z", "0"-"9", "_"] )* >
+|   < INTEGER_LITERAL : ( ["0"-"9"] )+ >
+
+}
+
+void Goal() :
+{}
+{
+    MainClass() ( TypeDeclaration() )* <EOF>
+}
+
+void MainClass() :
+{}
+{
+    <CLASS> Identifier() <LBRACE>
+        <PUBLIC> <STATIC> <VOID> <MAIN> <LPAREN> <STRING> <LBRACK> <RBRACK> Identifier() <RPAREN> <LBRACE>
+            ( LOOKAHEAD(2) VarDeclaration() )*
+            ( Statement() )*
+        <RBRACE>
+    <RBRACE>
+}
+
+void TypeDeclaration() :
+{}
+{
+      LOOKAHEAD(3) ClassDeclaration()
+    | ClassExtendsDeclaration()
+}
+
+void ClassDeclaration() :
+{}
+{
+    <CLASS> Identifier() <LBRACE>
+        ( VarDeclaration() )*
+        ( MethodDeclaration() )*
+    <RBRACE>
+}
+
+void ClassExtendsDeclaration() :
+{}
+{
+    <CLASS> Identifier() <EXTENDS> Identifier() <LBRACE>
+        ( VarDeclaration() )*
+        ( MethodDeclaration() )*
+    <RBRACE>
+}
+
+void VarDeclaration() :
+{}
+{
+    Type() Identifier() <SEMI>
+}
+
+void MethodDeclaration() :
+{}
+{
+    <PUBLIC> Type() Identifier() <LPAREN> [ FormalParameterList()] <RPAREN> <LBRACE>
+        ( LOOKAHEAD(2) VarDeclaration() )*
+        ( Statement() )*
+        <RETURN> Expression() <SEMI>
+    <RBRACE>
+}
+
+void FormalParameterList() :
+{}
+{
+    FormalParameter() ( FormalParameterRest() )*
+}
+
+void FormalParameter() :
+{}
+{
+    Type() Identifier()
+}
+
+void FormalParameterRest() :
+{}
+{
+    <COMMA> FormalParameter()
+}
+
+void Type() :
+{}
+{
+      LOOKAHEAD(3) ArrayType()
+    | BooleanType()
+    | IntegerType()
+    | Identifier()
+}
+
+void ArrayType() :
+{}
+{
+    <INT> <LBRACK> <RBRACK>
+}
+
+void BooleanType() :
+{}
+{
+    <BOOLEAN>
+}
+
+void IntegerType() :
+{}
+{
+    <INT>
+}
+
+void Identifier() :
+{}
+{
+    <IDENTIFIER>
+}
+
+
+void PrimaryExpression() : 
+{}
+{
+      IntegerLiteral()
+    | TrueLiteral()
+    | FalseLiteral()
+    | Identifier()
+    | ThisExpression()
+    | LOOKAHEAD(3) ArrayAllocationExpression()
+    | AllocationExpression()
+    | <LPAREN> Expression() <RPAREN>
+}
+
+void IntegerLiteral() : 
+{}
+{
+    <INTEGER_LITERAL>
+}
+
+void TrueLiteral() : 
+{}
+{
+    <TRUE>
+}
+
+void FalseLiteral() : 
+{}
+{
+    <FALSE>
+}
+
+void ThisExpression() : 
+{}
+{
+    <THIS>
+}
+
+void ArrayAllocationExpression() : 
+{}
+{
+    <NEW> <INT> <LBRACK> Expression() <RBRACK>
+}
+
+void AllocationExpression() : 
+{}
+{
+    <NEW> <IDENTIFIER> <LPAREN> <RPAREN>
+}
+
+void PostfixExpression() :
+{}
+{
+    PrimaryExpression()
+
+    (
+          <LBRACK> Expression() <RBRACK>
+        | LOOKAHEAD(2) <DOT> <LENGTH>
+        | LOOKAHEAD( <DOT> Identifier() <LPAREN> ) <DOT> Identifier() <LPAREN> [ ExpressionList() ] <RPAREN>
+    )*
+}
+
+void Expression() : 
+{}
+{
+    AndExpression()
+}
+
+void ExpressionList() :
+{}
+{
+    Expression() ( ExpressionRest() )*
+}
+
+void ExpressionRest() : 
+{}
+{
+    <COMMA> Expression()
+}
+
+void UnaryExpression() :
+{}
+{
+      <BANG> UnaryExpression()
+    | PostfixExpression()
+}
+
+void MulExpression() :
+{}
+{
+    UnaryExpression() ( <STAR> UnaryExpression() )*
+}
+
+void AddExpression() :
+{}
+{
+    MulExpression() ( (<PLUS> | <MINUS>) MulExpression() )*
+}
+
+void CompareExpression() :
+{}
+{
+    AddExpression() ( <LT> AddExpression() )*
+}
+
+void AndExpression() :
+{}
+{
+    CompareExpression() ( <AND> CompareExpression() )*
+}
+
+void Block() :
+{}
+{
+    <LBRACE> ( Statement() )* <RBRACE>
+}
+
+void Statement() :
+{}
+{
+      Block()
+    | LOOKAHEAD(2) AssignmentStatement()
+    | LOOKAHEAD(2) ArrayAssignmentStatement()
+    | IfStatement()
+    | WhileStatement()
+    | PrintStatement()
+}
+
+void PrintStatement() :
+{}
+{
+    <PRINTLN> <LPAREN> Expression() <RPAREN> <SEMI>
+}
+
+void WhileStatement() :
+{}
+{
+    <WHILE> <LPAREN> Expression() <RPAREN> Statement()
+}
+
+void IfStatement() :
+{}
+{
+    <IF> <LPAREN> Expression() <RPAREN> Statement() <ELSE> Statement()
+}
+
+void ArrayAssignmentStatement() :
+{}
+{
+    Identifier() <LBRACK> Expression() <RBRACK> <ASSIGN> Expression() <SEMI>
+}
+
+void AssignmentStatement() :
+{}
+{
+    Identifier() <ASSIGN> Expression() <SEMI>
+}
+
