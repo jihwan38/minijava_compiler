@@ -62,6 +62,23 @@ TOKEN : {
 
 }
 
+void Goal() :
+{}
+{
+    MainClass() ( TypeDeclaration() )* <EOF>
+}
+
+void MainClass() :
+{}
+{
+    <CLASS> Identifier() <LBRACE>
+        <PUBLIC> <STATIC> <VOID> <MAIN> <LPAREN> <STRING> <LBRACK> <RBRACK> Identifier() <RPAREN> <LBRACE>
+            ( LOOKAHEAD(2) VarDeclaration() )*
+            ( Statement() )*
+        <RBRACE>
+    <RBRACE>
+}
+
 void TypeDeclaration() :
 {}
 {
