@@ -62,16 +62,6 @@ TOKEN : {
 
 }
 
-
-void Type() :
-{}
-{
-      LOOKAHEAD(3) ArrayType()
-    | BooleanType()
-    | IntegerType()
-    | Identifier()
-}
-
 void ArrayType() :
 {}
 {
@@ -94,4 +84,63 @@ void Identifier() :
 {}
 {
     <IDENTIFIER>
+}
+
+void Type() :
+{}
+{
+      LOOKAHEAD(3) ArrayType()
+    | BooleanType()
+    | IntegerType()
+    | Identifier()
+}
+
+
+void IntegerLiteral() : 
+{}
+{
+    <INTEGER_LITERAL>
+}
+
+void TrueLiteral() : 
+{}
+{
+    <TRUE>
+}
+
+void FalseLiteral() : 
+{}
+{
+    <FALSE>
+}
+
+void ThisExpression() : 
+{}
+{
+    <THIS>
+}
+
+void ArrayAllocationExpression() : 
+{}
+{
+    <NEW> <INT> <LBRACK> Expression() <RBRACK>
+}
+
+void AllocationExpression() : 
+{}
+{
+    <NEW> <IDENTIFIER> <LPAREN> <RPAREN>
+}
+
+void PrimaryExpression() : 
+{}
+{
+      IntegerLiteral()
+    | TrueLiteral()
+    | FalseLiteral()
+    | Identifier()
+    | ThisExpression()
+    | LOOKAHEAD(3) ArrayAllocationExpression()
+    | AllocationExpression()
+    | "(" Expression() ")"
 }

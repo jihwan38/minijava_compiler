@@ -1,0 +1,875 @@
+3 장 파싱
+(Parsing) 
+최광훈 
+전남대학교 Andrew Appel, Modern Compiler Implementation in Java (2nd. Ed.) 
+- Jens Palsberg 교수의  컴파일러  강의 자료 참고
+프런트엔드 (Front end) 
+파서
+- 문맥 자유(context-free) 구문 분석 
+   * 토큰의  나열이  올바른  문법 구조를  이루는지 
+- 문맥에  민감한  분석을  가이드 
+   * 타입 검사, 선언 여부 확인 등 의미 분석을  
+안내
+- IR ( 중간 표현) 을 생성
+  * 이후 최적화  및 코드 생성의  기반을  마련 2
+- 오류 처리
+  * 의미 있는 오류 메시지를  생성
+  * 오류 복구를  시도
+
+목차
+LL 파싱 
+[ 실습] MiniJava 파서 (JavaCC ) 
+LR 파싱
+3
+구문 분석(Syntax analysis) 
+문맥 자유 문법(Context-free grammar, CFG) (S, VN , VT , P)
+- VN : 비단말 (Nonterminals) 기호 집합 
+    * 언어 안에 나타나는  ( 부분) 문자열들의  집합을  나타내는  구문 변수
+    * 문법에  구조를  부여하는  역할
+- VT : 단말(Terminals) 기호 집합 
+    * 스캐너가  반환하는  토큰들의  집합
+- …
+4
+구문 분석(Syntax analysis) 
+문맥 자유 문법(Context-free grammar, CFG) (S, VN , VT , P)
+- …
+- S : 시작 기호 ( 비단말 )
+- P : 생산 규칙(productions) 집합
+    * 단말과  비단말을  어떻게  결합하여  언어의  문자열을  만들 수 있는지  
+    * 각 생성 규칙의  왼편(left-hand side) 는 1 개의 비단말만  올 수 있음 A -> … 
+- V = VN ⋃ VT : 문법 G 의 어휘 
+5
+[ 참고] 표기법과  용어
+a, b, c ∈ Vt         단말 기호
+A, B, C ∈ Vn   비단말  기호
+U, V, W ∈ V    모든 기호
+α, β, ⋎  ∈ V*    0 이상 반복 기호 열
+u, v, w ∈ Vt*    0 이상 반복 단말 기호 
+열
+6- 단일 유도 (a single-step derivation) 
+  :  α A β  => α ⋎ β     if  A -> ⋎  
+- 다중 유도  ≥0 또는 ≥1 
+  :  =>*  또는  =>+
+- 문장 형태(sentential forms) 
+  :  S =>* β 
+- 문장(sentence) 와 언어
+  :  L(G) = { w ∈ Vt* | S =>+ w} 
+
+구문 분석
+구문 분석을  위한 문법 작성 형식 : 백커스  나우어  폼 (Backus-Naur form, BNF) 
+예:   <goal> ::= <expr> 
+       <expr> ::= <expr> <op><expr> 
+                     |  num
+                     |  id
+       <op>    ::= +  |  -  | *   |  /
+숫자와  변수를  사용하는  간단한  식의 언어를  기술하는  문법
+비단말  (< … > 또는 대문자 ), 단말 기호(typewriter 폰트, 밑줄), 생산규칙 
+7
+스캐닝  vs 파싱
+스캐닝과  파싱의  구분은  어디인가 ?
+ - 정규식은  변수, 숫자, 키워드를  분류하는데  사용
+ - 정규식은  토큰을  기술하는데  ( 문법보다 ) 간단
+ - 정규식으로부터  ( 문법으로부터  보다) 빠른 스캐너를  만들 수 있음
+8
+
+스캐닝  vs 파싱 
+스캐닝과  파싱의  구분은  어디인가 ?
+ - 문맥 자유 문법은  괄호 ( ), begin … end, if … then … else 매칭에  사용
+ - 문맥 자유 문법은  식의 구조를  부여하는  역할 
+구문 분석은  상당히  복잡함  (C 문법은  300 여개의  생산 규칙으로  구성)
+어휘 분석을  구문 분석에서  별도 단계로  분리하면  컴파일러를  유지 보수하는데  
+장점
+9
+유도 (Derivations) 
+CFG 의 생산 규칙을  기호를  재작성하는  규칙(rewriting rules) 으로 볼 수 있음
+앞서 숫자와  변수 식에 대한 CFG 문법을  활용하여  x + 2 * y 를 유도하는  과정 
+<goal> => <expr> 
+            => <expr> <op> <expr> 
+              . . . 
+            => <id,x> +  <num,2> <op> <expr> 
+            => <id,x> +  <num,2> * <expr> 
+            => <id,x> +  <num,2> * <id,y> 
+<goal> =>* id + num * id 10- 일련의  재작성  과정(=>) 을 유도(a derivation) 
+   또는 파스(a parse) 라고 한다
+- 그 유도 과정을  찾아내는  작업을  파싱(parsing) 이라고  
+함.
+유도 (Derivations) 
+<goal> => <expr> 
+            => <expr> <op> <expr> 
+            => <expr> <op> <expr> <op> <expr> 
+            => <id,x> <op>  <expr> <op> <expr> 
+            => <id,x> +  <expr> <op> <expr> 
+            => <id,x> +  <num,2> <op> <expr> 
+            => <id,x> +  <num,2> * <expr> 
+            => <id,x> +  <num,2> * <id,y> 
+11
+유도(Derivations) 
+각 단계에서  재작성으로  대체할  비단말  기호를  선택
+여러 비단말  기호가  있을 경우 이 선택에  따라 서로 다른 유도가  만들어질  수 있음
+특히 중요한  두 가지 유도 방식 
+ - 좌측 유도 (Leftmost derivation) : 매 단계마다  좌측의  비단말을  대체
+ - 우측 유도 (Rightmost derivation): 매 단계마다  우측의  비단말을  대체
+앞의 예시는  좌측 유도였음 !
+12
+유도 (Derivations) 
+좌측 유도 (Leftmost derivations) 
+<goal>  => <expr>  
+            => <expr>  <op> <expr> 
+            => <expr>  <op> <expr> <op> <expr> 
+            => <id,x> <op>   <expr> <op> <expr> 
+            => <id,x> +  <expr>  <op> <expr> 
+            => <id,x> +  <num,2> <op>  <expr> 
+            => <id,x> +  <num,2> * <expr> 
+            => <id,x> +  <num,2> * <id,y> 13<goal> =>* id + num * id 
+유도 (Derivations) 
+우측 유도 (Rightmost derivations) 
+<goal>  => <expr>  
+            => <expr> <op> <expr>  
+            => <expr> <op>  <id,y> 
+            => <expr>  * <id,y> 
+            => <expr> <op> <expr>  * <id,y> 
+            => <expr> <op>  <num,2> * <id,y> 
+            => <expr>  + <num,2> * <id,y> 
+            => <id,x> + <num,2> * <id,y> 14<goal> =>* id + num * id 
+우선순위  (Precedence) 
+오른쪽과  같이 x + 2 * y 의 파스 트리를  만들고 
+트리를  따라 계산해보면 (Treewalk evaluation): 
+  (x + 2) * y 
+=> 계산 순서가  잘못됨 !
+=> x + (2 * y) 를 계산해야함 
+Q. x  + (2 * y) 를 계산하는  파스 트리?
+15
+( 좌측 유도 
+결과)
+우선순위  (Precedence) 
+앞의 예제 문법은  x + 2 * y 에 대해 두 가지 유도, (x+2)*y 파스 트리와  x+(2*y) 파스 트리가  가능
+우선 순위( 괄호가  없을 때 암묵적인  계산 순서) 에 대한 개념이  없음
+우선 순위를  고려해서  다시 작성한  문법:
+16
+이 문법은  유도 과정에  우선순위를  
+강제한다 .
+- <term> 은 <expr> 에서 유도되고 ,
+- <factor> 는 <term> 에서 유도된다 !
+우선순위  (Precedence) 
+새로운  문법으로  x + 2 * y 를 유도하면 :
+  <goal>  => <expr> 
+              => <expr> + <term> 
+              => <expr> + <term> * <factor> 
+              => <expr> + <term>  * <id, y> 
+              => <expr>  + <num, 2> * <id, y> 
+              => <term>  + <num, 2> * <id, y> 
+              => <factor>  + <num, 2> * <id, y> 
+              => <id, x> + <num, 2> * <id, y> 17<goal> =>* id + num * id 
+이번에는  x + (2 * y) 파스 트리를  
+만듬
+우선순위  (Precedence) 
+오른쪽  파스 트리를  따라 계산하면 
+ x + (2 * y) 
+18
+( 우측 유도 
+결과)
+우선순위  (Precedence) 
+Q. x + 2 + y  
+ - P.16 의 문법의  좌측 유도( 또는, 우측 유도에서 ) 좌결합  (x+2)+y 파스 트리를  확인하시오 .
+Q. z = w = 2 
+ - 할당식을  허용하고 , 할당식은  우결합  z = (w = 2) 이 되도록   P.16 문법을  수정하시오 . 
+ - z = w = 2 를 유도해보고  파스 트리를  확인하시오 . 
+19
+모호함 (Ambiguity) 
+어떤 문법이  하나의  동일한  문장 형태(sentential form) 에 대해 둘 이상의  유도 
+과정을  허용한다면  그 문법은  모호하다 (ambiguous). 
+예)  <stmt> ::= if <expr> then <stmt> 
+                    |  if <expr> then <stmt> else <stmt> 
+                    | other stmts 
+     if E1 then if E2 then S1 else S2   문장을  유도하는  과정이  두 가지 있음
+이 모호함은  의미 해석 이전에  발생하는  구문 문법에서  비롯된  것이고 ,
+문맥 자유 문법에서의  모호함이다 . 20
+모호함 (Ambiguity) 
+문법을  재구성해서  모호함을  없앨 수도 있음 
+예)  <stmt> ::= <matched> | <unmatched> 
+      <matched> ::= if <expr> then <matched> else <matched>  |  other stmts 
+      <unmatched> ::= if <expr> then <stmt> 
+                              |  if <expr> then <matched> else <unmatched> 
+- 새로운  문법은  앞서 모호한  문법과  동일한  언어를  생성
+- else 를 가장 가까운  미결합  then 에 연결하도록  구성함 
+    => 일반적으로  받아들여지는  해석
+ 21
+모호함 (Ambiguity) 
+모호함은  보통 문맥 자유 문법 명세에서의  혼동 때문에  발생 
+문맥 의존에서도  혼동이  발생할  수 있음: 예) 오버로딩 (overloading) 
+예) a = f ( 17 ) ; b = f (17, ‘a’); 
+      (f 는 int 인자의  함수 또는 int 인자와  char 인자 두 개를 받는 함수)
+‘f’ 를 구분하려면  함수 f 의 선언과  같은 문맥이  필요
+ - 문맥 자유의  영역이  아님
+ - 함수 f 의 타입의  정보를  이용하는  문제
+=> 파싱을  더 복잡하게  만들기보다는 , 이 문제는  별도의  단계에서  처리하는  것이 
+보통.22
+파싱 (Parsing): 전체 흐름 
+우리의  목표는  파서를  만들어내는  유연한  시스템을  만들기 !
+23
+
+하향(Top-down) vs. 상향(Bottom-up) 
+하향 파서(Top-down parsers) 
+ - 유도 트리의  루트에서  시작하여  
+아래로  채워 나감
+ - 생성 규칙을  선택하고  입력과의  
+일치를  시도함 
+ - 경우에  따라 백트래킹이  필요
+ - 일부 문법은  백트래킹  없이 처리 
+가능함 ( 예측 파싱 predictive parsing) 
+24상향식  파서 (Bottom-up parsers) 
+ - 유도 트리의  잎에서  시작하여  위로 
+채워 나감
+ - 올바른  첫 토큰에  대해 유효한  
+상태에서  시작함 
+ - 입력을  소비하면서  가능한  경우를  
+인코딩하도록  상태를  변경함  (valid 
+prefixes 를 인식함 )
+ - 상태와  문장 형태(sentential forms)
+를 저장하기  위해 스택을  사용함 
+하향 파싱(Top-down parsing) 
+- 하향 파서는  구문 분석 트리의  루트, 즉 문법의  시작 기호에서  시작함 
+- 구문 분석 트리의  leaf sequence 가 입력 문자열과  일치할  때까지  아래 단계를  
+반복
+ 1. A 의 노드에서 , 생성 규칙 A -> α 를 선택, α 의 각 기호에  알맞은  자식 노드를  
+생성함 
+ 2. leaf sequence 에 추가된  단말 기호가  입력 문자열과  일치하지  않으면  백트래킹 
+ 3. 다음 확장할  노드( 비단말  기호) 를 찾음
+- 핵심은  1 단계에서  입력 문자열의  안내에  따라 올바른  생성 규칙을  선택하는  것 25
+간단 식의 문법
+입력 문자열 : x - 2 * y 
+26
+
+27
+예제
+핵심은  1 단계에서  
+입력 문자열의  
+안내에  따라 
+올바른  생성 규칙을  
+선택하는  것!
+28
+예제
+동일한  입력 x - 2 * y 에 다른 유도
+잘못된  선택을  하면, 무한 반복 파싱 진행 ( 왜? 맨 왼쪽 <expr> 만 반복 확장하기  
+때문)
+(But 파서는  반드시  종료되어야  함!)
+왼쪽 재귀 구조(Left-recursion) 
+Top-down 파서는  문법에서  왼쪽 재귀 구조(left recursion) 를 처리할  수 없음.
+( 정의) 문법이  왼쪽 재귀 형태(left-recursive) 
+ - ∃A ∈ Vn  such that A =>+ Aα for some string α 
+  - 비단말  기호 A 가 Aα 로 유도되는 , 그러한  A 가 존재하는  문법은  왼쪽 재귀 형태
+앞서 살펴본  단순한  식 문법은  왼쪽 재귀 구조임 !
+29
+왼쪽 재귀 구조를  제거하는  변환
+왼쪽 재귀 구조를  제거하기  위해, 문법을  변환 ( 변환 전후 문법의  언어는  동일!)
+왼쪽 재귀 구조의  문법 예시
+   G1: <foo> ::= <foo> α    |     β         ( 전제: α 와 β 는 <foo> 로 시작하지  않음)
+이 문법을  다음과  같이 다시 쓸 수 있음
+   G2: <foo> ::= β <bar> 
+         <bar> ::= α <bar>     |     Ɛ       (<bar> 는 새로 도입한  비단말  기호)
+변환 후 문법은  왼쪽 재귀 구조가  포함되어  있지 않다!
+Q.   L(G1) = L(G2) ? 
+30
+왼쪽 재귀 구조를  제거하는  변환
+왼쪽 재귀 구조가  있는 문법 G1
+31그 구조를  제거하는  변환 후 문법 G2
+하향 파서가  G2 를 따르면  구문 분석은  반드시  종료 
+종료 문제는  해결되었으나 , 어떤 입력을  보고 backtrack 하는 상황은  여전히  발생할  수 있음
+동일 언어  vs 동일 의미
+동일한  언어이지만  L(G1) = L(G2) = L(G3),  G1/G2 의 파스 트리 ≠ G3 의 파스 트리
+ - G3: 연산자  오른쪽  결합(right associativity), G1/G2: 왼쪽 결합(left assoc.) 
+32
+ G1 G2 G3
+언어 동일 동일 동일
+하향식  
+파싱불가 ( 무한 
+loop) 가능 가능
+파스 트리G1=G2( 왼
+쪽결합 )G1=G2( 왼
+쪽결합 )≠ ( 오른쪽  
+결합)
+최종 문법 G2
+왼쪽 재귀 구조를  제거한  문법
+33
+
+얼마나  많은 lookahead 가 필요한가 ?
+하향 파서는  잘못된  생산 규칙을  선택하면  backtrack 할 수 있음 
+임의의  CFG 를 파싱하려면  임의로  긴 lookahead 가 필요한가 ?
+ - 일반적으로  Yes: Earley 알고리즘 ,  Cocke-Younger-Kasami(CYK) 알고리즘 
+제한된  길이의  lookahead 로 파싱할  수 있는 CFG 도 상당히  많음
+대부분의  프로그래밍  언어 구문이  이러한  CFG 에 해당. 
+대표적으로 ,
+ - LL(1) : Left-to-right scan, Left-most derivation, 1-token lookahead 
+ - LR(1) : Left-to-right scan, Right-most derivation, 1-token lookahead 
+34
+예측 파싱(Predictive parsing) 
+기본 아이디어  
+ - 비단말  A 에 대해 두 개의 생산 규칙 A -> α, A -> β 가 있다면 , 
+ - 파서가  올바른  생산 규칙을  구별해서  선택하는  방법이  필요
+FIRST(α) : α 에서 유도되는  어떤 문자열에서  처음 나타나는  단말기호들 ( 의 집합)
+ - α =>* a ⋎* 이면, a ∈ FIRST(α)     ( 단말기호  a ∈ Vt)
+35
+예측 파싱(Predictive parsing) 
+…
+FIRST(α) : α 에서 유도되는  어떤 문자열에서  처음 나타나는  단말기호들 ( 의 집합)
+ - α =>* a ⋎* 이면, a ∈ FIRST(α)     ( 단말기호  a ∈ Vt)
+예측 파싱의  Key 조건:
+ - 두 생산 규칙이  함께 존재할  때, A -> α, A -> β, 
+ - 예측 파싱을  위해 필요한  조건: FIRST(α) ⋂ FIRST(β) = Ø 
+=> 이 조건으로 , 파서는  오직 1 개의 기호로  된 lookahead 로 올바른  선택을  할 수 
+있음
+간단식의  문법 G2 는 이 조건을  만족!
+36
+Left factoring ( 좌인수  분해)
+주어진  문법이  앞의 FIRST 에 대한 Key 성질을  만족하지  않는 경우, 좌인수  분해로  
+Key 성질을  만족하는  문법으로  변환할  수도 있음 ( 항상 가능한  것은 아님)
+좌인수  분해
+ - 비단말  A 의 여러 선택지들이  공통 prefix α 를 가지면 , 그 공통 부분을  묶어냄 
+      A -> α β1 | … | α βn   ⇒  A -> α A’ 과  A’-> β1 | … | βn   (A’ 은 새로운  비단말  기호)
+ - 하나의  비단말에  대해 두 개 이상의  선택지가  공통 prefix 를 더 이상 가지지  않을 
+때까지  이 과정을  반복 반복
+37
+Left factoring ( 좌인수  분해)
+간단 식 문법 G3 ( 우측 재귀 구조)
+생산 규칙 2, 3, 4 를 구별하려면 , num 이나 id 를 넘어서  +, -, *, / 를 확인해야  함
+  FIRST(2) ⋂ FIRST(3) ⋂ FIRST(4) ≠ Ø  
+이 문법은  Key 성질을  갖고 있지 않음!
+38
+
+Left factoring ( 좌인수  분해)
+두 단말 기호 <expr> 과 <term> 
+39좌인수  분해를  적용한  다음,
+
+Left factoring ( 좌인수  분해)
+좌인수  분해 결과, G3 는 아래의  문법 G4 로 변환됨 ( 우측 재귀 구조는  그대로 )
+단 하나의  토큰 lookahead 만으로도  생산 규칙을  선택할  수 있음!
+40
+
+Left factoring ( 좌인수  분해)
+다음 기호만  보면
+각 선택을  올바르게 
+결정할  수 있음
+41
+
+다시 왼쪽 재귀 구조 제거
+전형적인  단계: 좌인수  분해 변환 ->  왼쪽 재귀 구조를  제거 -> LL(1) 
+ - 비단말  A 의 생산규칙에  왼쪽 재귀 구조가  있다면 , 
+         A -> A α | β | … |  ⋎ 
+    ⇒ A -> N A’ 
+         N -> β | … |  ⋎
+         A’ -> α A’ | Ɛ
+ - 왼쪽 재귀 구조가  더 이상 남아 있지 않을 때까지  이 과정을  반복 
+42
+일반성 
+Q. 좌인수분해와  왼쪽 재귀 구조를  제거하면  모든 문맥자유문법 (CFG) 을 하나의  
+토큰 lookahead 만으로  예측 파싱할  수 있는 형태로  변환할  수 있을까 ?
+A. 주어진  문맥자유문법이  예측 파싱의  Key 조건을  만족하지  않을 때, 그와 동등한
+(equivalent) 문법 중에서  그 조건을  만족하는  문법이  존재하는지  여부는  
+undecidable 하다.
+예) 
+      => 어떤 유도를  선택할지  결정하려면 , 0 또는 1 이 나타날  때까지  임의의  개수의  
+a 를 더 살펴봐야  함!43
+
+재귀 하강 파싱(Recursive descent parsing) 
+우결합  문법 G4 로부터  구성한  재귀 하강 파서
+44
+
+재귀 하강 파싱(Recursive descent parsing) 
+우결합  문법 G4 로부터  구성한  재귀 하강 파서
+45
+
+파스 트리 만들기 
+파서의  중요한  역할은  소스 코드의  중간 표현 IR(AST) 을 만드는  것
+아래의  코드를  적절히  추가하여  추상 구문 트리(AST) 를 만들 수 있음:
+ - factor() 는 id 와 num 을 스택에  push 하고
+ - term_prim() 은 *, / 을 스택에  push 하고
+ - term() 은 스택에서  3 개를 pop 하고 subtree 를 만들어  다시 스택에  push 
+ - expr_prime() 은 +, - 를 스택에  push 하고
+ - expr() 은 스택에서  3 개를 pop 하고 subtree 를 만들어  다시 스택에  push 
+ - goal() 은 스택에서  pop 한 트리를  리턴
+46
+비재귀  예측 파싱(Non-recursive predictive parsing) 
+관찰 Observation: 
+ - 재귀 하강 파서는  상태 정보를 , 파서를  실행할  때 스택(runtime stack), 즉 호출 
+스택(call stack) 에 인코딩하고  있음. 
+ - 하지만  스택 추상화를  구현하기  위해 재귀 함수 호출을  사용하는  방식은  그다지  
+효율적이지  않을 수 있음.
+다른 구현 방법:
+ - 명시적  스택(explicit stack) 을 사용하는  손으로  직접 작성한  파서
+ - 스택 기반(stack-based), 테이블  구동(table-driven) 파서 47
+비재귀  예측 파싱(Non-recursive predictive parsing) 
+예측 파서의  구조
+- 파서 코드를  작성하는  대신 테이블을  만듬
+- 테이블  만들기를  자동화 !
+48
+
+테이블을  사용하는  파서(Table-driven parsers) 
+파서 생성 시스템의  구조
+이는 top-down (LL) 파서와  bottom-up (LR) 파서 모두에  해당한다 .
+49
+
+비재귀  예측 파싱(Non-recursive predictive parsing) 
+입력: 
+ - 문자열  w 와 
+ - 파싱 테이블  M
+   ( 문법 G 의 M)
+50
+
+비재귀  예측 파싱(Non-recursive predictive parsing) 
+지금 필요한  것은 파싱 테이블  M !
+간단 식의 문법:                                      파싱 테이블 : 
+51
+
+FIRST 
+FIRST(α) : α 에서 유도되는  어떤 문자열에서  처음 나타나는  단말기호들 ( 의 집합)
+ - { a ∈ Vt | α =>* a β* } 
+ - 만일 α =>* Ɛ 이면 Ɛ ∈ FIRST(α) 
+52
+FIRST 
+기호 X 에 대하여 , FIRST(X) 를 구하는  알고리즘 
+53
+
+FOLLOW 
+비단말  A 에 대해, FOLLOW(A) 
+ - 어떤 문장 형태 안에서  A 의 바로 오른쪽에  나타날  수 있는 단말기호들의  집합
+따라서  비단말의  FOLLOW 집합은  그 비단말  뒤에 문법적으로  올 수 있는 토큰들 
+단말기호에  대해서는  FOLLOW 집합을  정의하지  않음
+54
+FOLLOW 
+비단말  A 에 대해, FOLLOW(A) 를 구하는  알고리즘  
+55
+$ : End of token 
+ ( 입력의  끝)
+LL(1) 문법
+[ 기존 정의] 문법 G 는 LL(1): 
+ - 모든 비단말기호  A 의 
+    서로 다른 두 생산 규칙 A -> β, A -> ⋎ 에 대해 
+       FIRST(β) ⋂ FIRST( ⋎) = Ø 
+예외 사례: A=>* ε 이면?  
+ - 예: A -> a |  ε 이면, { a } ⋂ { ε } = Ø 이지만 , 
+     FOLLOW(A) 에 a 가 포함되면  두 생성 규칙 중 어느 것을 선택할지  결정할  수 
+없음56
+LL(1) 문법
+[ 수정된  정의] 문법 G 는 LL(1): 
+ - 모든 비단말기호  A 의 
+    서로 다른 두 생산 규칙 A -> α1, …, A -> αn에 대해 
+       1. FIRST(α1),  …, FIRST(αn) 의 어느 쌍을 선택해도  겹치지  않고(pairwise 
+disjoint) 
+       2. αi  =>* ε 이면 FIRST(αj) ⋂ FOLLOW(A) = Ø,  모든 j, 1 ≤ j ≤ n,   i ≠ j 
+만일 G 의 언어에  ε 가 속하지  않으면 (ε-free) 조건 1 로 충분히  LL(1) 을 정의할  수 
+있음 57
+LL(1) 문법
+LL(1) 문법에  대해 증명된  사실 (1/2) 
+ - 예시: 
+     S -> a S | a     LL(1) 이 아님. FIRST(a S) ⋂ FIRST(a) = { a } 
+     S -> a S’         LL(1) 이 맞음.  위 문법의  언어와  동일한  언어이지만 .
+     S’ -> a S’ | ε       Follow(S’) = Follow(S) = { $ } ≠ { a } = First (a S’) 
+       
+   
+58
+LL(1) 파싱 테이블  만들기 
+입력: 문법 G
+출력: 파싱 테이블  M
+ 1. 모든 생산 규칙 A -> α 
+     1.1) 모든 a ∈ FIRST(α),   M[A, a] 에 A -> α 추가 
+     1.2) 만약 ε ∈ FIRST(α) 이면,  
+             1.2.1) 모든 b ∈ FOLLOW(A),   M[A, b] 에 A -> α 추가 
+             1.2.2) 만약 $  ∈ FOLLOW(A) 이면,   M[A, $] 에 A -> α 추가 
+  2. M 의 나머지  채워지지  않은 곳, error 
+59어떤 곳 M[A, a] 가 둘 이상 채워지면 , 
+입력 문법은  LL(1) 이 아님
+LL(1) 파싱 테이블  만들기  ( 예제)
+문법 G3
+60
+
+LL(1) 이 아닌 문법 예제
+     <stmt> ::= if <expr> then <stmt>  |  if <expr> then <stmt> else <stmt> | … 
+좌인수  분해하면 ,
+     <stmt> ::= if <expr> then <stmt> <stmt’> | … 
+     <stmt’> ::= else <stmt> | ε 
+FIRST( <stmt’> ) = { ε, else }                  FOLLOW( <stmt’> ) = { else, $ } 
+그런데 , FIRST( <stmt’> ) ⋂ FOLLOW( <stmt’> ) = { else } ≠ Ø,  따라서  LL(1) 이 
+아님!
+Fix: <stmt’> ::= else <stmt> 를 우선 선택하도록  하여 else 를 가장 가까운  이전 
+then 과 쌍을 지어 해결!61
+에러 복구
+핵심 개념
+ - 각 비단말  기호에  대해 파서가  동기화  할 수 있는 단말들의  집합을  구성
+ - A 를 찾는 과정에서  오류가  발생하면 , SYNCH(A) 의 원소가  나올 때까지  입력을  
+건너뜀 
+SYNCH 구성 방법
+ - FOLLOW(A) 의 각 단말 a 를 SYNCH(A) 에 추가   ( 예: 문장 끝 ; 가 나올 때까지 )
+ - 문장을  시작하는  키워드들도  SYNCH(A) 에 추가   ( 예: 새 문장이  시작되는  
+곳까지 )
+ - FIRST(A) 의 기호들도  SYNCH(A) 에 추가 ( 예: A 의 생산 규칙에서  직접 나오는  
+곳까지 )62
+에러 복구
+에러 복구 방법: 스택 맨 위의 단말과  입력이  일치하지  않으면 ,
+ - 그 단말을  스택에서  pop 함
+ - 그 단말이  삽입되었다고  가정했다는  메시지를  출력
+ - 그 다음 파싱을  계속
+즉, SYNCH(a) = Vt - { a } 
+63
+목차
+LL 파싱
+[ 실습] MiniJava 파서 (JavaCC ) 
+LR 파싱
+64
+The Java Compiler Compiler (JavaCC) 
+- Java 용 Lex 와 Yacc 
+- LR/LALR(1) 대신 LL(k) 방식 사용
+- EBNF(Extended Backus-Naur Form) 로 문법을  작성하고 , LL(k) 파서를  생성
+- 문법 안에 Java 액션 코드를  추가 작성 가능 (Yacc 에서 C 액션 코드 작성 방식과  
+비슷)
+- 필요하면  lookahead 길이 조정 가능
+- 문법 명세 전체를  하나의  파일(.jj) 에 작성
+65
+JavaCC 문법 명세 형식
+문법 명세 전체를  하나의  파일(.jj) 에 작성
+ - 헤더
+ - 어휘 분석을  위한 토큰 명세
+ - 문법 (+ 액션 코드)
+66
+[ 문법] StatementListReturn -> Statement* return Expression ; [ 토큰]  INTEGER_LITERAL: [1-9]  [0-9]*   |   0 
+JavaCC 문법 명세 형식
+교재 3.4 Using Parser Generators 참고 (JavaCC 버전 Grammar 3.31) 
+ - void Assignment() : {} { Identifier() "=" Expression() ";" } 
+ => Assignment -> Identifier = Expression ; 
+ - 왼쪽 기호 Assignment() 
+ - 오른쪽  기호들  Identifier(), “=”, Expression(), “;” 
+67
+JavaCC 문법 명세 형식
+교재 3.4 Using Parser Generators 참고 ( 문법 Grammar 3.30) 
+68
+
+JavaCC 문법 명세 형식
+교재 3.4 Using Parser Generators 참고 (JavaCC 버전 Grammar 3.31) 
+69
+
+JavaCC 문법 명세 형식
+교재 3.4 Using Parser Generators 참고 (JavaCC 버전 Grammar 3.31) 
+ - void StmList () : 
+   { }
+   {  Stm () 
+   |   StmList()  “;” Stm() 
+   }
+70Left recursion detected: 
+"StmList... --> StmList..." 
+JavaCC 문법 명세 형식
+$ javacc MiniJavaLexer.jj          // 파서 코드를  생성
+$ javac *.java                           // 생성된  파서 코드를  컴파일 
+$ java Main < Factorial.java    // 컴파일된  파서를  실행 
+71
+MiniJava LL(k) EBNF 문법
+문법: chap3/MiniJava_EBNF.txt 
+72Goal 
+  ::= MainClass TypeDeclaration* EOF 
+MainClass 
+  ::= "class" Identifier "{" 
+        "public" "static" "void" "main" 
+        "(" "String" "[" "]" Identifier ")" 
+        "{" 
+          ( LOOKAHEAD(2) VarDeclaration ) *
+          Statement *
+        "}" 
+      "}" 
+TypeDeclaration 
+  ::= LOOKAHEAD(3) ClassDeclaration 
+   |  ClassExtendsDeclaration - EBNF ( Extended  Backus-Naur Form) 
+MainClass -> class Identifier { 
+   public static void main ( String [ ] Identifier ) 
+   {  VarDeclaration *  Statement * }
+}
+MiniJava LL(k) EBNF 문법
+문법: chap3/MiniJava_EBNF.txt 
+73Goal 
+  ::= MainClass TypeDeclaration* EOF 
+MainClass 
+  ::= "class" Identifier "{" 
+        "public" "static" "void" "main" 
+        "(" "String" "[" "]" Identifier ")" 
+        "{" 
+          ( LOOKAHEAD(2) VarDeclaration )* 
+          Statement* 
+        "}" 
+      "}" 
+TypeDeclaration 
+  ::= LOOKAHEAD(3)  ClassDeclaration 
+   |  ClassExtendsDeclaration - k-lookahead 
+TypeDeclaration 
+  ::= LOOKAHEAD(3)  ClassDeclaration 
+   |  ClassExtendsDeclaration 
+- 예) class C {    … } 
+        class C extends  D { … } 
+  처음 두 토큰은  class Identifier 까지 같으므로 
+  그 다음 세 번째 토큰을  봐야 구문 가능:
+- { 이면 ClassDeclaration, 
+  extends 이면 ClassExtendsDeclaration 
+MiniJava LL(k) EBNF 문법
+- LOOKAHEAD(2) VarDeclaration() : 변수 선언인지 , 일반 문장(assign) 인지
+- LOOKAHEAD(3) TypeDeclaration() : class C { 와 class C extends D { 구분
+- LOOKAHEAD(3) Type() : int [ ] 와 int 구분
+- LOOKAHEAD(2) AssignmentStatement / ArrayAssignmentStatement : 
+  x = … 와 x [ … ] = … 구분
+- LOOKAHEAD( “. “ Identifier() “(“ ) : .length 와 .method() 구분
+- LOOKAHEAD(3) ArrayAllocationExpression() : new int [ … ] 와 new C ( ) 구분
+74
+MiniJava LL(k) EBNF 문법
+연산자  우선 순위를  고려한  문법
+75Expression 
+  ::= AndExpression 
+AndExpression 
+  ::= CompareExpression { "&&" CompareExpression } 
+CompareExpression 
+  ::= AddExpression { "<" AddExpression } 
+AddExpression 
+  ::= MulExpression { ("+" | "-") MulExpression } 
+MulExpression 
+  ::= UnaryExpression { "*" UnaryExpression } 
+UnaryExpression 
+  ::= "!" UnaryExpression 
+   |  PostfixExpression 
+PostfixExpression 
+  ::= PrimaryExpression 
+      {
+          "[" Expression "]" 
+        | LOOKAHEAD(2) "." "length" 
+        | LOOKAHEAD( "." Identifier() "(" ) "." Identifier "(" [ ExpressionList ] ")" 
+      }
+ExpressionList 
+  ::= Expression { ExpressionRest } 
+ExpressionRest 
+  ::= "," Expression 
+PrimaryExpression 
+  ::= IntegerLiteral 
+   |  TrueLiteral 
+   |  FalseLiteral 
+   |  Identifier 
+   |  ThisExpression 
+   |  LOOKAHEAD(3) ArrayAllocationExpression 
+   |  AllocationExpression 
+   |  "(" Expression ")" 
+[ 실습] MiniJava 파서 만들기 
+- chap3 에서 2 장에서  작성한  javacc 폴더를  복사해와서  그 안의 MiniJavaLexer.jj 에 
+MiniJava 문법을  추가 수정 작성해서  MiniJava 파서 만들기 
+- 목표: programs/*.java 8 개 테스트  프로그램을  모두 성공적으로  파싱
+76
+목차
+LL 파싱
+[ 실습] MiniJava 파서 (JavaCC ) 
+LR 파싱
+77
+용어 복습
+S =>* α 이면, α 는 문장 형태(sentential form) 
+ - α ∈ Vt 이면, α 는 L(G) 의 문장(sentence) 
+ - 아니면 , (α 는 L(G) 에 속하는  문장이  아닌) 문장 형태
+왼쪽 문장 형태(Left-sentential form): 
+ - 왼쪽 비단말기호  유도(leftmost derivation) 로 나타나는  형태
+오른쪽  문장 형태(Right-sentential form): 
+ - 오른쪽  비단말기호  유도(rightmost derivation) 로 나타나는  형태
+78
+상향 파싱(Bottom-up parsing) 
+목표
+ - 입력 문자열  w 와 문법 G 가 주어졌을때 , 
+ - 파스 트리를  리프(leaf) 에서 시작하여  루트(root) 방향으로  만들기  
+파서는  언어의  우측 문장 형태(right-sentential form) 를 현재까지  만들어진  트리의  
+상단 경계(upper frontier) 와 반복적으로  매칭
+각 매칭이  이루어질  때마다 , 파서는  축약(reduction) 을 적용하여  현재 경계를  확장
+ - 각 축약에서 , 부분적으로  만들어진  트리들의  상단 경계 와 생성 규칙의  RHS 를 
+매치
+ - 그 경계 위에 새로운  노드( 매치된  생성 규칙의  LHS) 하나를  추가
+최종 결과는  최우측  유도(rightmost derivation) 을 거꾸로  뒤집은  과정79
+상향 파싱(Bottom-up parsing): 예제
+문법
+    1:  S -> a A B e 
+    2:  A -> A b c 
+    3:       |  b 
+    4: B -> d 
+입력
+    a b b c d e 
+80
+핵심은  입력을  스캔하면서  올바른  
+문장 형태(sentential form) 를 
+찾아내는  것!생산
+(productions) 문장 형태
+(sentential forms) 
+3: A -> b a b b c d e 
+2: A -> A b c a A b c  d e
+4: B -> d a A d e
+1: S -> a A B e a A B e 
+- S
+상향 파싱(Bottom-up parsing): 
+81ɛ a b b c d e $ shift
+a   b b c d e $ shift
+a b      b c d e $ reduce 
+a A      b c d e $ shift
+a A b        c d e $ shift
+a A b c          d e $ reduce 
+a A          d e $ shift
+a A d            e $ reduce 
+a A B            e $ shift
+a A B e            e $ reduce 
+S               $ 
+
+상향 파싱(Bottom-up parsing): 
+82
+상단 경계
+(upper frontier) 
+손잡이 / 핸들(Handles) 
+83찾고자  하는 것은 상단 경계(upper frontier) 의 부분 문자열  α
+ - 이 부분 문자열과  일치하는  RHS 를 갖는 생산 A -> α 
+ - α 를 A 로 축약할  수 있고, 이 과정은  오른쪽  비단말  유도의  역과정의  한 단계
+ - 이런 부분 문자열  α 를 손잡이 / 핸들이라고  함손잡이 / 핸들(Handles): 문자열  전체를  바로 줄이는  것이 
+아니라 , 현재 문장 형태에서  지금 잡아서  축약할  수 있는 부분
+손잡이 / 핸들(Handles) 
+84오른쪽  문장 형태 ⋎ 의 핸들
+ - ⋎ 의 핸들 : A -> β 와  ⋎ 안의 β 의 위치
+ - β 를 A 로 바꾸면  이전 오른쪽  문장 형태를  얻을 수 있어야  함
+ - S =>*rm     α         A    w =>rm α          β    w
+예)   S =>*rm a A     B     e  =>rm a A     d     e
+                             B -> d 손잡이 / 핸들(Handles): 문자열  전체를  바로 줄이는  것이 
+아니라 , 현재 문장 형태에서  지금 잡아서  축약할  수 있는 부분
+α, β, ⋎  ∈ V*   단말/ 비단말  기호 열
+u, v, w ∈ Vt*    단말 기호 열
+손잡이 / 핸들(Handles) 
+85α  β  w 의 핸들 A -> β 
+
+손잡이 / 핸들(Handles) 
+86정리(Theorem) 
+ - 문법 G 가 모호하지  않다면 (unambiguous), 모든 우측 문장 형태(right-sentential 
+form) 는 유일한  손잡이 / 핸들(handle) 을 갖음
+증명
+ - 모호하지  않는 문법으로  우측 비단만  유도는  유일함  
+ - ⋎i-1에서 ⋎i 로 가기 위해 적용된  생성 규칙 A -> β 도 유일
+ - 또한 A -> β 가 적용되는  위치 k 도 유일
+ - 따라서 , 손잡이 / 핸들 A -> β 도 유일
+손잡이 / 핸들(Handles) 
+87정리(Theorem) 
+ - 문법 G 가 모호하지  않다면 (unambiguous), 모든 우측 문장 형태(right-sentential 
+form) 는 유일한  손잡이 / 핸들(handle) 을 갖음
+증명
+ - 모호하지  않는 문법으로  우측 비단만  유도는  유일함  
+ - ⋎i-1 에서 ⋎i 로 가기 위해 적용된  생성 규칙 A -> β 도 유일
+ - 또한 A -> β 가 적용되는  위치 k 도 유일
+ - 따라서 , 손잡이 / 핸들 A -> β 도 유일증명 아이디어 :
+비모호한  문법에서는  한 문자열에  대해 파스 트리가  하나만  존재한다 .
+따라서  그 문자열을  만들어내는  우측 최다 유도(rightmost derivation) 도 하나만  존재한다 .
+그런데  handle 은 바로 그 우측 최다 유도를  거꾸로  되돌릴  때 현재 단계에서  reduce 해야 하는 
+부분이다 .
+우측 최다 유도가  유일하다면 , 지금 단계에서  되돌려야  할 생성 규칙도  하나뿐이고 , 그 규칙이  
+적용되는  위치도  하나뿐이다 .
+따라서  handle 도 유일하다 .
+손잡이 / 핸들(Handles): 상향 파싱은  최우측  유도 역 과정
+88좌측 재귀 구조 문법 G2 의 최우측  유도와  손잡이 / 핸들
+
+손잡이 / 핸들 제거(Handle pruning) 
+89손잡이 / 핸들 가지치기 : 상향 파스 트리를  만들어가는  과정
+최우측  유도(rightmost derivation) 가 있다고  하면,
+ - S => ⋎1 => ⋎2 => … => ⋎n-1 => ⋎n => w 
+이 유도에서  상향 파스 트리를  구성하려면  i 를 n 으로 두고 다음 과정을  반복
+ - for i = n downto 1 
+    1.   ⋎i 안에서  핸들 A -> βi 를 찾음
+    2.   ⋎i 안에서  βi를 A 로 대체하여 ( 축약) ⋎i-1로 변환
+전체 과정 2n 단계: 핸들 찾기 단계 + 축약 단계  ( 유도 길이 n)
+스택 구현
+90손잡이 / 핸들 제거(Handle pruning) 의 
+상향 파서를  구현하는  방법
+ - Shift-Reduce 파서 
+두 가지 요소
+ - 스택
+ - 입력 버퍼 절차
+1. stack <- $ 
+2. 스택 top 이 S 시작 기호이고  입력 
+토큰이  $ 일 때까지  반복 
+  2.1 손잡이 / 핸들이  없으면 , shift 
+  2.2 손잡이 / 핸들 A -> β 를 reduce 
+     2.2.1 스택에서  β 를 pop
+     2.2.2 스택에  A 를 push 
+예제: x - 2 * y 
+91
+1. 스택 Top 이 손잡이 / 핸들의  오른편  끝일 때까지  Shift 
+ 2. 손잡이 / 핸들의  왼편 끝을 찾아 Reduce 
+5 shift + 9 reduce + 1 accept 
+Shift-reduce 파싱
+Shift-reduce 파서는  이해하기  쉬움
+Shift-reduce 파서의  4 가지 액션
+   1. shift: 다음 입력 기호를  스택의  맨 위로 옮김
+   2. reduce:  스택 맨위의  handle 오른쪽  끝부터  handle 의 왼쪽 끝을 찾아
+                   handle 을 스택에서  pop 하고,  
+                   해당 생성 규칙의  좌변(LHS) 에 해당하는  비단말을  push 
+   3. accept: 파싱을  종료하고  성공을  알린다 .
+   4. error: 오류 복구 루틴(error recovery routine) 을 호출한다 .
+핵심 문제: 손잡이 / 핸들을  어떻게  찾아내는가 ? ( 이 강의에서는  다루지  않음)
+92
+LR(k) 문법
+[ 정의] 문법 G 가 LR(k): 
+ - 최우측  유도(rightmost derivation) 
+      S => ⋎1 => ⋎2 => … => ⋎n-1 => ⋎n => w 
+   유도 과정의  각 오른편  문장 형태 ⋎i에 대해 
+     1. 그 ⋎i의 손잡이 / 핸들을  찾아낼  수 있고,
+     2. 어떤 생성 규칙으로  축약할지  결정할  수 있으며 
+     3. ⋎i 를 왼쪽에서  오른쪽으로  진행하며  손잡이 / 핸들의  오른쪽  끝을 지나 
+         최대 k 개 기호(k 개 lookahead) 까지만  살펴보고  결정할  수 있어야  함
+93LR(k) 
+ - L: Left-to-right 
+ - R: Rightmost derivation in reverse 
+ - k: 최대 k 개 lookahead 
+현재 상태에서  어디가  손잡이 / 핸들인지 , 
+그리고  무슨 규칙으로  줄여야  하는지를  
+많지 않은 lookahead 만으로  결정할  수 
+있어야  함.
+LR(k) 문법
+[ 정의] 문법 G 가 L(k): 
+  1. S =>*rm α A w =>rm α β w  이고
+  2. S =>*rm ⋎ B x =>rm α β y    이며
+  3. FIRSTk(w) = FIRSTk(y)    일때
+  =>  α A y = ⋎ B x 문장 형태 α β w 와 α β y 가 주어지고 ,
+공통 접두사  α β 와 k-lookahead 
+FIRSTk(w) = FIRSTk(y) 를 가정,
+α β w 는 α A w 로, α β y 는 ⋎ B y 로 축약
+그러나 , 공통 접두사를  가졌기  때문에     
+α β y 는 α A y 로 축약되어 , 
+α A y = ⋎ B x 이다. 
+94
+왜 LR 문법을  공부?
+LR(1) 문법은  파서를  만들기  위해서  자주 사용됨 . LR(1) 파서
+ - 가장 널리 사용되는  파서
+ - 거의 모든 자유 문맥 문법의  PL 구문을  표현할  수 있음
+ - LR  문법은  결정적 (deterministic)· 하향 파서가  처리할  수 있는 가장 일반적인  문법
+ - LR(1)  문법에  대해서는  고성능  파서를  손쉽게  구현할  수 있음
+ - 입력을  왼쪽에서  오른쪽으로  한 번 스캔하면서  가능한  가장 빨리 오류를  발견
+95
+왜 LR 문법을  공부?
+LR(1) 문법은  파서를  만들기  위해서  자주 사용됨 . LR(1) 파서
+ - LR  문법은  예측 파서(LL) 가 인식할  수 있는 언어 집합을  모두 포함
+ LL(k) : A -> β 의 β 의 k 개 기호를  보고(lookahead) 무엇을  펼칠지를  결정
+            ( 무엇을  펼칠까 ?)
+ LR(k) : β 가 파생한  전체 문자열을  모두 읽은 다음, 그 뒤에 이어지는 
+             k 개 기호(look ‑ahead) 를 함께 고려하여  β ( 핸들) 을 축약 대상으로  인식
+             ( 무엇을  줄일까 ?)
+96
+왼편 vs. 오른편  재귀 
+오른쪽  재귀 구조
+ - predictive parser 에서 종료(termination) 를 위해 필요
+ - 더 많은 스택 공간(stack space) 을 요구
+ - 우결합  연산자 (right-associative operators) 에 적합
+왼쪽 재귀 구조
+ - 상향 파서에서  문제 없이 동작
+ - 필요한  스택 공간을  줄일 수 있음
+ - 좌결합  연산자 (left-associative operators) 에 적합
+97
+왼쪽 vs. 오른쪽  재귀 
+Rule of thumb 
+ - 하향 파서에서는  오른쪽  재귀 구조의  문법
+ - 상향 파서에서는  왼쪽 재귀 구조의  문법
+98
+요약
+재귀 하강(Recursive descent) 파서 
+ - 문법( 보통 LL(1) 문법) 을 서로 재귀적으로  호출하는  일련의  프로시저를  직접 구현
+ - 따라서  recursive descent parser 는 LL(1) 의 언어적  제약 대부분을  그대로  갖음
+LL(k) 파서: 어떤 생성 규칙의  사용을 , 그 우변의  처음 k 개 기호만  보고 인식
+ - A -> β 와 A -> ⋎ 중 어느 것을 선택?
+LR(k) 파서:  어떤 생성 규칙의  우변이  실제로  나타났음을 , 그 우변으로부터  파생된  
+문자열  전체를  모두 읽은 뒤, 추가로  k 개의 lookahead 기호를  보고 인식
+ - A -> β 와 B -> β 중 어느 것을 선택?
+99
