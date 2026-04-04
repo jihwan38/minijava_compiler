@@ -62,6 +62,31 @@ TOKEN : {
 
 }
 
+void TypeDeclaration() :
+{}
+{
+      LOOKAHEAD(3) ClassDeclaration()
+    | ClassExtendsDeclaration()
+}
+
+void ClassDeclaration() :
+{}
+{
+    <CLASS> Identifier() <LBRACE>
+        ( VarDeclaration() )*
+        ( MethodDeclaration() )*
+    <RBRACE>
+}
+
+void ClassExtendsDeclaration() :
+{}
+{
+    <CLASS> Identifier() <EXTENDS> Identifier() <LBRACE>
+        ( VarDeclaration() )*
+        ( MethodDeclaration() )*
+    <RBRACE>
+}
+
 void VarDeclaration() :
 {}
 {
@@ -71,8 +96,7 @@ void VarDeclaration() :
 void MethodDeclaration() :
 {}
 {
-    <PUBLIC> Type() Identifier() <LPAREN> [ FormalParameterList()] <RPAREN>
-    <LBRACE>
+    <PUBLIC> Type() Identifier() <LPAREN> [ FormalParameterList()] <RPAREN> <LBRACE>
         ( LOOKAHEAD(2) VarDeclaration() )*
         ( Statement() )*
         <RETURN> Expression() <SEMI>
