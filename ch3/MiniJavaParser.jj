@@ -1,0 +1,79 @@
+options {
+    JAVA_UNICODE_ESCAPE = true;
+}
+
+PARSER_BEGIN(MiniJavaParser)
+
+public class MiniJavaParser {
+}
+PARSER_END(MiniJavaParser)
+
+SKIP : {
+    " "
+|   "\t"
+|   "\n"
+|   "\r"
+}
+
+SPECIAL_TOKEN : {
+    < SINGLE_LINE_COMMENT: "//" (~["\n","\r"])* ("\n"|"\r"|"\r\n") >
+
+|   < MULTI_LINE_COMMENT: "/*" (~["*"])* "*" ("*" | (~["*","/"] (~["*"])* "*"))* "/" >
+}
+
+TOKEN : {
+    < CLASS : "class" >
+|   < PUBLIC : "public" >
+|   < STATIC : "static" >
+|   < VOID : "void" >
+|   < MAIN : "main" >
+|   < STRING : "String" >
+|   < EXTENDS : "extends" >
+|   < RETURN : "return" >
+|   < INT : "int" >
+|   < BOOLEAN : "boolean" >
+|   < IF : "if" >
+|   < ELSE : "else" >
+|   < WHILE : "while" >
+|   < PRINTLN : "System.out.println" >
+|   < LENGTH : "length" >
+|   < TRUE : "true" >
+|   < FALSE : "false" >
+|   < THIS : "this" >
+|   < NEW : "new" >
+|   < LBRACE : "{" >
+|   < RBRACE : "}" >
+|   < LPAREN : "(" >
+|   < RPAREN : ")" >
+|   < LBRACK : "[" >
+|   < RBRACK : "]" >
+|   < SEMI : ";" >
+|   < COMMA : "," >
+|   < ASSIGN : "=" >
+|   < AND : "&&" >
+|   < LT : "<" >
+|   < PLUS : "+" >
+|   < MINUS : "-" >
+|   < STAR : "*" >
+|   < DOT : "." >
+|   < BANG : "!" >
+|   < IDENTIFIER : ["a"-"z", "A"-"Z"] ( ["a"-"z", "A"-"Z", "0"-"9", "_"] )* >
+|   < INTEGER_LITERAL : ( ["0"-"9"] )+ >
+
+}
+
+void Goal() :
+{}
+{
+    ( MiniJavaToken() )* <EOF>
+}
+
+void MiniJavaToken() :
+{}
+{
+    <CLASS> | <PUBLIC>  | <STATIC>  | <VOID>        | <MAIN>    | <STRING>  | <EXTENDS> | <RETURN>
+|   <INT>   | <BOOLEAN> | <IF>      | <ELSE>        | <WHILE>   | <PRINTLN> | <LENGTH>  | <TRUE>
+|   <FALSE> | <THIS>    | <NEW>     | <LBRACE>      | <RBRACE>  | <LPAREN>  | <RPAREN>  | <LBRACK>
+|   <RBRACK>| <SEMI>    | <COMMA>   | <ASSIGN>      | <AND>     | <LT>      | <PLUS>    | <MINUS>
+|   <STAR>  | <DOT>     | <BANG>    | <IDENTIFIER>  | <INTEGER_LITERAL>
+}
