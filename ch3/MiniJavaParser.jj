@@ -160,7 +160,7 @@ void PostfixExpression() :
 void Expression() : 
 {}
 {
-    PostfixExpression()
+    AndExpression()
 }
 
 void ExpressionList() :
@@ -173,4 +173,36 @@ void ExpressionRest() :
 {}
 {
     <COMMA> Expression()
+}
+
+
+void UnaryExpression() :
+{}
+{
+      <BANG> UnaryExpression()
+    | PostfixExpression()
+}
+
+void MulExpression() :
+{}
+{
+    UnaryExpression() ( <STAR> UnaryExpression() )*
+}
+
+void AddExpression() :
+{}
+{
+    MulExpression() ( (<PLUS> | <MINUS>) MulExpression() )*
+}
+
+void CompareExpression() :
+{}
+{
+    AddExpression() ( <LT> AddExpression() )*
+}
+
+void AndExpression() :
+{}
+{
+    CompareExpression() ( <AND> CompareExpression() )*
 }
