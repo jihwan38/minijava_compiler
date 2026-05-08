@@ -1,0 +1,370 @@
+options {
+    JAVA_UNICODE_ESCAPE = true;
+    STATIC = false;
+}
+
+PARSER_BEGIN(MiniJavaParser)
+
+import syntaxtree.*;
+
+public class MiniJavaParser {
+}
+PARSER_END(MiniJavaParser)
+
+SKIP : {
+    " "
+|   "\t"
+|   "\n"
+|   "\r"
+}
+
+SPECIAL_TOKEN : {
+    < SINGLE_LINE_COMMENT: "//" (~["\n","\r"])* ("\n"|"\r"|"\r\n") >
+
+|   < MULTI_LINE_COMMENT: "/*" (~["*"])* "*" ("*" | (~["*","/"] (~["*"])* "*"))* "/" >
+}
+
+TOKEN : {
+    < CLASS : "class" >
+|   < PUBLIC : "public" >
+|   < STATIC : "static" >
+|   < VOID : "void" >
+|   < MAIN : "main" >
+|   < STRING : "String" >
+|   < EXTENDS : "extends" >
+|   < RETURN : "return" >
+|   < INT : "int" >
+|   < BOOLEAN : "boolean" >
+|   < IF : "if" >
+|   < ELSE : "else" >
+|   < WHILE : "while" >
+|   < PRINTLN : "System.out.println" >
+|   < LENGTH : "length" >
+|   < TRUE : "true" >
+|   < FALSE : "false" >
+|   < THIS : "this" >
+|   < NEW : "new" >
+|   < LBRACE : "{" >
+|   < RBRACE : "}" >
+|   < LPAREN : "(" >
+|   < RPAREN : ")" >
+|   < LBRACK : "[" >
+|   < RBRACK : "]" >
+|   < SEMI : ";" >
+|   < COMMA : "," >
+|   < ASSIGN : "=" >
+|   < AND : "&&" >
+|   < LT : "<" >
+|   < PLUS : "+" >
+|   < MINUS : "-" >
+|   < STAR : "*" >
+|   < DOT : "." >
+|   < BANG : "!" >
+|   < IDENTIFIER : ["a"-"z", "A"-"Z"] ( ["a"-"z", "A"-"Z", "0"-"9", "_"] )* >
+|   < INTEGER_LITERAL : ( ["0"-"9"] )+ >
+
+}
+
+Program Goal() :
+{ MainClass m; ClassDeclList cl = new ClassDeclList(); ClassDecl c; }
+{
+    m=MainClass() 
+    ( c=TypeDeclaration() { cl.addElement(c); } )* 
+    <EOF>
+    { return new Program(m, cl); }
+}
+
+MainClass MainClass() :
+{ Identifier i1, i2; Statement s; }
+{
+    <CLASS> i1=Identifier() <LBRACE>
+        <PUBLIC> <STATIC> <VOID> <MAIN> <LPAREN> <STRING> <LBRACK> <RBRACK> i2=Identifier() <RPAREN> <LBRACE>
+            s=Statement()
+        <RBRACE>
+    <RBRACE>
+    { return new MainClass(i1, i2, s); }
+}
+
+ClassDecl TypeDeclaration() :
+{ ClassDecl c; }
+{
+    (
+      LOOKAHEAD(3) c=ClassDeclaration()
+    | c=ClassExtendsDeclaration()
+    )
+    { return c; }
+}
+
+ClassDecl ClassDeclaration() :
+{ Identifier i; VarDeclList vl = new VarDeclList(); VarDecl v; MethodDeclList ml = new MethodDeclList(); MethodDecl m; }
+{
+    <CLASS> i=Identifier() <LBRACE>
+        ( v=VarDeclaration() { vl.addElement(v); } )*
+        ( m=MethodDeclaration() { ml.addElement(m); } )*
+    <RBRACE>
+    { return new ClassDeclSimple(i, vl, ml); }
+}
+
+ClassDecl ClassExtendsDeclaration() :
+{ Identifier i, j; VarDeclList vl = new VarDeclList(); VarDecl v; MethodDeclList ml = new MethodDeclList(); MethodDecl m; }
+{
+    <CLASS> i=Identifier() <EXTENDS> j=Identifier() <LBRACE>
+        ( v=VarDeclaration() { vl.addElement(v); } )*
+        ( m=MethodDeclaration() { ml.addElement(m); } )*
+    <RBRACE>
+    { return new ClassDeclExtends(i, j, vl, ml); }
+}
+
+VarDecl VarDeclaration() :
+{ Type t; Identifier i; }
+{
+    t=Type() i=Identifier() <SEMI> { return new VarDecl(t, i); }
+}
+
+MethodDecl MethodDeclaration() :
+{ Type t; Identifier i; FormalList fl = new FormalList(); VarDeclList vl = new VarDeclList(); VarDecl v; StatementList sl = new StatementList(); Statement s; Exp e; }
+{
+    <PUBLIC> t=Type() i=Identifier() <LPAREN> [ fl=FormalParameterList() ] <RPAREN> <LBRACE>
+        ( LOOKAHEAD(2) v=VarDeclaration() { vl.addElement(v); } )*
+        ( s=Statement() { sl.addElement(s); } )*
+        <RETURN> e=Expression() <SEMI>
+    <RBRACE>
+    { return new MethodDecl(t, i, fl, vl, sl, e); }
+}
+
+FormalList FormalParameterList() :
+{ FormalList fl = new FormalList(); Formal f; }
+{
+    f=FormalParameter() { fl.addElement(f); } 
+    ( f=FormalParameterRest() { fl.addElement(f); } )*
+    { return fl; }
+}
+
+Formal FormalParameter() :
+{ Type t; Identifier i; }
+{
+    t=Type() i=Identifier() { return new Formal(t, i); }
+}
+
+Formal FormalParameterRest() :
+{ Formal f; }
+{
+    <COMMA> f=FormalParameter() { return f; }
+}
+
+Type Type() :
+{ Type t; Identifier i; }
+{
+      LOOKAHEAD(3) t=ArrayType() { return t; }
+    | t=BooleanType() { return t; }
+    | t=IntegerType() { return t; }
+    | i=Identifier() { return new IdentifierType(i.s); }
+}
+
+Type ArrayType() :
+{}
+{
+    <INT> <LBRACK> <RBRACK> { return new IntArrayType(); }
+}
+
+Type BooleanType() :
+{}
+{
+    <BOOLEAN> { return new BooleanType(); }
+}
+
+Type IntegerType() :
+{}
+{
+    <INT> { return new IntegerType(); }
+}
+
+Identifier Identifier() :
+{ Token t; }
+{
+    t = <IDENTIFIER>
+    { return new Identifier(t.image); }
+}
+
+
+Exp PrimaryExpression() : 
+{ Exp e; Identifier i; }
+{
+    (
+      e=IntegerLiteral()
+    | e=TrueLiteral()
+    | e=FalseLiteral()
+    | i=Identifier() { e = new IdentifierExp(i.s); }
+    | e=ThisExpression()
+    | LOOKAHEAD(3) e=ArrayAllocationExpression()
+    | e=AllocationExpression()
+    | <LPAREN> e=Expression() <RPAREN>
+    )
+    { return e; }
+}
+
+Exp IntegerLiteral() : 
+{ Token t; }
+{
+    t = <INTEGER_LITERAL>
+    { return new IntegerLiteral(Integer.parseInt(t.image)); }
+}
+
+Exp TrueLiteral() : 
+{}
+{
+    <TRUE> { return new True(); }
+}
+
+Exp FalseLiteral() : 
+{}
+{
+    <FALSE> { return new False(); }
+}
+
+Exp ThisExpression() : 
+{}
+{
+    <THIS> { return new This(); }
+}
+
+Exp ArrayAllocationExpression() : 
+{ Exp size; }
+{
+    <NEW> <INT> <LBRACK> size=Expression() <RBRACK> { return new NewArray(size); }
+}
+
+Exp AllocationExpression() : 
+{ Identifier i; }
+{
+    <NEW> i=Identifier() <LPAREN> <RPAREN> { return new NewObject(i); }
+}
+
+Exp PostfixExpression() :
+{ Exp e1, e2; Identifier i; ExpList el; }
+{
+    e1=PrimaryExpression()
+
+    (
+          <LBRACK> e2=Expression() <RBRACK> { e1 = new ArrayLookup(e1, e2); }
+        | LOOKAHEAD(2) <DOT> <LENGTH> { e1 = new ArrayLength(e1); }
+        | LOOKAHEAD( <DOT> Identifier() <LPAREN> ) <DOT> i=Identifier() <LPAREN> 
+          { el = new ExpList(); } [ el=ExpressionList() ] 
+          <RPAREN> { e1 = new Call(e1, i, el); }
+    )*
+    { return e1; }
+}
+
+Exp Expression() : 
+{ Exp e; }
+{
+    e=AndExpression() { return e; }
+}
+
+ExpList ExpressionList() :
+{ ExpList el = new ExpList(); Exp e; }
+{
+    e=Expression() { el.addElement(e); } 
+    ( e=ExpressionRest() { el.addElement(e); } )*
+    { return el; }
+}
+
+Exp ExpressionRest() : 
+{ Exp e; }
+{
+    <COMMA> e=Expression() { return e; }
+}
+
+Exp UnaryExpression() :
+{ Exp e; }
+{
+      <BANG> e=UnaryExpression() { return new Not(e); }
+    | e=PostfixExpression() { return e; }
+}
+
+Exp MulExpression() :
+{ Exp e1, e2; }
+{
+    e1=UnaryExpression() ( <STAR> e2=UnaryExpression() { e1 = new Times(e1, e2); } )*
+    { return e1; }
+}
+
+Exp AddExpression() :
+{ Exp e1, e2; Token op; }
+{
+    e1=MulExpression() 
+    ( (op=<PLUS> | op=<MINUS>) e2=MulExpression() 
+      { if (op.kind == PLUS) e1 = new Plus(e1, e2); else e1 = new Minus(e1, e2); } )*
+    { return e1; }
+}
+
+Exp CompareExpression() :
+{ Exp e1, e2; }
+{
+    e1=AddExpression() ( <LT> e2=AddExpression() { e1 = new LessThan(e1, e2); } )*
+    { return e1; }
+}
+
+Exp AndExpression() :
+{ Exp e1, e2; }
+{
+    e1=CompareExpression() ( <AND> e2=CompareExpression() { e1 = new And(e1, e2); } )*
+    { return e1; }
+}
+
+Statement Block() :
+{ StatementList sl = new StatementList(); Statement s; }
+{
+    <LBRACE> ( s=Statement() { sl.addElement(s); } )* <RBRACE>
+    { return new Block(sl); }
+}
+
+Statement Statement() :
+{ Statement s; }
+{
+    (
+      s=Block()
+    | LOOKAHEAD(2) s=AssignmentStatement()
+    | LOOKAHEAD(2) s=ArrayAssignmentStatement()
+    | s=IfStatement()
+    | s=WhileStatement()
+    | s=PrintStatement()
+    )
+    { return s; }
+}
+
+Statement PrintStatement() :
+{ Exp e; }
+{
+    <PRINTLN> <LPAREN> e=Expression() <RPAREN> <SEMI>
+    { return new Print(e); }
+}
+
+Statement WhileStatement() :
+{ Exp e; Statement s; }
+{
+    <WHILE> <LPAREN> e=Expression() <RPAREN> s=Statement()
+    { return new While(e, s); }
+}
+
+Statement IfStatement() :
+{ Exp e; Statement s1, s2; }
+{
+    <IF> <LPAREN> e=Expression() <RPAREN> s1=Statement() <ELSE> s2=Statement()
+    { return new If(e, s1, s2); }
+}
+
+Statement ArrayAssignmentStatement() :
+{ Identifier i; Exp e1, e2; }
+{
+    i=Identifier() <LBRACK> e1=Expression() <RBRACK> <ASSIGN> e2=Expression() <SEMI>
+    { return new ArrayAssign(i, e1, e2); }
+}
+
+Statement AssignmentStatement() :
+{ Identifier i; Exp e; }
+{
+    i=Identifier() <ASSIGN> e=Expression() <SEMI>
+    { return new Assign(i, e); }
+}
+

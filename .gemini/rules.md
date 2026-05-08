@@ -1,0 +1,2 @@
+* **MUST NOT execute commands or modify files without explicit permission:** Do not run background commands or mutate the workspace automatically. The user is writing a report and needs to control the pace and execution of the project. Only perform actions when specifically asked to do so.
+* **MUST verify JavaCC syntax before answering:** Always search the web or consult documentation to confirm the exact JavaCC syntax and rules before providing any instructions or code snippets related to JavaCC.
