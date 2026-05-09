@@ -3,9 +3,9 @@ package visitor;
 import syntaxtree.*;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Iterator;
 
 public class TypeCheckVisitor implements TypeVisitor {
 
@@ -102,6 +102,52 @@ public class TypeCheckVisitor implements TypeVisitor {
         c.parent = parent;
         classes.put(id, c);
         return true;
+    }
+
+    private boolean isSameType(Type t1, Type t2) {
+        if (t1 == null || t2 == null) return false;
+        if (t1 instanceof IntegerType && t2 instanceof IntegerType) return true;
+        if (t1 instanceof BooleanType && t2 instanceof BooleanType) return true;
+        if (t1 instanceof IntArrayType && t2 instanceof IntArrayType) return true;
+        if (t1 instanceof IdentifierType && t2 instanceof IdentifierType) {
+            return ((IdentifierType) t1).s.equals(((IdentifierType) t2).s);
+        }
+        return false;
+    }
+
+    private void checkOverloading(ClassInfo c, MethodInfo m) {
+        if (c.parent == null) return;
+        
+        ClassInfo parentClass = classes.get(c.parent);
+        while (parentClass != null) {
+            if (parentClass.methods.containsKey(m.name)) {
+                MethodInfo parentMethod = parentClass.methods.get(m.name);
+                
+                boolean isMatch = true;
+                if (!isSameType(m.returnType, parentMethod.returnType)) isMatch = false;
+                if (m.params.size() != parentMethod.params.size()) isMatch = false;
+                else {
+                    Iterator<Type> mParams = m.params.values().iterator();
+                    Iterator<Type> pParams = parentMethod.params.values().iterator();
+                    while (mParams.hasNext()) {
+                        if (!isSameType(mParams.next(), pParams.next())) {
+                            isMatch = false;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!isMatch) {
+                    error("method " + m.name + " in class " + c.name + " illegally overloads method in class " + parentClass.name);
+                }
+                return;
+            }
+            if (parentClass.parent != null) {
+                parentClass = classes.get(parentClass.parent);
+            } else {
+                parentClass = null;
+            }
+        }
     }
 
     private Type getVarType(String id) {
@@ -230,6 +276,7 @@ public class TypeCheckVisitor implements TypeVisitor {
             }
         } else {
             currentMethod = currentClass.methods.get(n.i.s);
+            checkOverloading(currentClass, currentMethod);
             n.t.accept(this);
             for (int i = 0; i < n.fl.size(); i++) {
                 n.fl.elementAt(i).accept(this);

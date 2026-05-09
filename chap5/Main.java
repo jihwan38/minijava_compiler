@@ -37,6 +37,13 @@ public class Main {
                     } else {
                         System.err.println("TEST FAIL: TestUndeclared.java generated " + errorCount + " errors (expected 7).");
                     }
+                } else if (path.endsWith("TestOverload.java")) {
+                    int errorCount = typeChecker.getErrors().size();
+                    if (errorCount == 5) {
+                        System.out.println("TEST PASS: TestOverload.java successfully generated exactly 5 errors.");
+                    } else {
+                        System.err.println("TEST FAIL: TestOverload.java generated " + errorCount + " errors (expected 5).");
+                    }
                 }
             } catch (ParseException e) {
                 System.err.println("Parse error in " + path + ":\n" + e.toString());
