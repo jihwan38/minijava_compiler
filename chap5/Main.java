@@ -44,6 +44,13 @@ public class Main {
                     } else {
                         System.err.println("TEST FAIL: TestOverload.java generated " + errorCount + " errors (expected 5).");
                     }
+                } else if (path.endsWith("TestAcyclic.java")) {
+                    int errorCount = typeChecker.getErrors().size();
+                    if (errorCount == 6) {
+                        System.out.println("TEST PASS: TestAcyclic.java successfully generated exactly 6 errors.");
+                    } else {
+                        System.err.println("TEST FAIL: TestAcyclic.java generated " + errorCount + " errors (expected 6).");
+                    }
                 }
             } catch (ParseException e) {
                 System.err.println("Parse error in " + path + ":\n" + e.toString());

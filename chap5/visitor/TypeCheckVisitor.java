@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Iterator;
+import java.util.HashSet;
 
 public class TypeCheckVisitor implements TypeVisitor {
 
@@ -150,6 +151,24 @@ public class TypeCheckVisitor implements TypeVisitor {
         }
     }
 
+    private void checkAcyclic(ClassInfo c) {
+        if (c.parent == null) return;
+        HashSet<String> visited = new HashSet<>();
+        visited.add(c.name);
+        
+        String currentParent = c.parent;
+        while (currentParent != null) {
+            if (visited.contains(currentParent)) {
+                error("cyclic inheritance involving class " + c.name);
+                return;
+            }
+            visited.add(currentParent);
+            ClassInfo parentInfo = classes.get(currentParent);
+            if (parentInfo == null) break;
+            currentParent = parentInfo.parent;
+        }
+    }
+
     private Type getVarType(String id) {
         if (currentMethod != null) {
             if (currentMethod.locals.containsKey(id)) return currentMethod.locals.get(id);
@@ -231,6 +250,7 @@ public class TypeCheckVisitor implements TypeVisitor {
                 error("cannot find symbol: class " + n.j.s);
             }
             currentClass = classes.get(n.i.s);
+            checkAcyclic(currentClass);
             for (int i = 0; i < n.vl.size(); i++) {
                 n.vl.elementAt(i).accept(this);
             }
