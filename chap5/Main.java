@@ -32,10 +32,10 @@ public class Main {
                     }
                 } else if (path.endsWith("TestUndeclared.java")) {
                     int errorCount = typeChecker.getErrors().size();
-                    if (errorCount == 5) {
-                        System.out.println("TEST PASS: TestUndeclared.java successfully generated exactly 5 errors.");
+                    if (errorCount == 7) {
+                        System.out.println("TEST PASS: TestUndeclared.java successfully generated exactly 7 errors.");
                     } else {
-                        System.err.println("TEST FAIL: TestUndeclared.java generated " + errorCount + " errors (expected 5).");
+                        System.err.println("TEST FAIL: TestUndeclared.java generated " + errorCount + " errors (expected 7).");
                     }
                 }
             } catch (ParseException e) {

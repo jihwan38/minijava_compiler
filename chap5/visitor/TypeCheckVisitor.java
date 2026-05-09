@@ -104,6 +104,24 @@ public class TypeCheckVisitor implements TypeVisitor {
         return true;
     }
 
+    private Type getVarType(String id) {
+        if (currentMethod != null) {
+            if (currentMethod.locals.containsKey(id)) return currentMethod.locals.get(id);
+            if (currentMethod.params.containsKey(id)) return currentMethod.params.get(id);
+        }
+        
+        ClassInfo c = currentClass;
+        while (c != null) {
+            if (c.fields.containsKey(id)) return c.fields.get(id);
+            if (c.parent != null) {
+                c = classes.get(c.parent);
+            } else {
+                c = null;
+            }
+        }
+        return null;
+    }
+
     public Type visit(Program n) { 
         n.m.accept(this);
         for (int i = 0; i < n.cl.size(); i++) {
@@ -138,6 +156,9 @@ public class TypeCheckVisitor implements TypeVisitor {
             currentClass = null;
         } else {
             currentClass = classes.get(n.i.s);
+            for (int i = 0; i < n.vl.size(); i++) {
+                n.vl.elementAt(i).accept(this);
+            }
             for (int i = 0; i < n.ml.size(); i++) {
                 n.ml.elementAt(i).accept(this);
             }
@@ -160,7 +181,13 @@ public class TypeCheckVisitor implements TypeVisitor {
             }
             currentClass = null;
         } else {
+            if (!classes.containsKey(n.j.s)) {
+                error("cannot find symbol: class " + n.j.s);
+            }
             currentClass = classes.get(n.i.s);
+            for (int i = 0; i < n.vl.size(); i++) {
+                n.vl.elementAt(i).accept(this);
+            }
             for (int i = 0; i < n.ml.size(); i++) {
                 n.ml.elementAt(i).accept(this);
             }
@@ -180,6 +207,8 @@ public class TypeCheckVisitor implements TypeVisitor {
                     error("variable " + n.i.s + " is already defined in class " + currentClass.name);
                 }
             }
+        } else {
+            n.t.accept(this);
         }
         return null; 
     }
@@ -201,6 +230,13 @@ public class TypeCheckVisitor implements TypeVisitor {
             }
         } else {
             currentMethod = currentClass.methods.get(n.i.s);
+            n.t.accept(this);
+            for (int i = 0; i < n.fl.size(); i++) {
+                n.fl.elementAt(i).accept(this);
+            }
+            for (int i = 0; i < n.vl.size(); i++) {
+                n.vl.elementAt(i).accept(this);
+            }
             for (int i = 0; i < n.sl.size(); i++) {
                 n.sl.elementAt(i).accept(this);
             }
@@ -215,34 +251,158 @@ public class TypeCheckVisitor implements TypeVisitor {
             if (!currentMethod.addParam(n.i.s, n.t)) {
                 error("variable " + n.i.s + " is already defined in method " + currentMethod.getSignature());
             }
+        } else {
+            n.t.accept(this);
         }
         return null; 
     }
     public Type visit(IntArrayType n) { return null; }
     public Type visit(BooleanType n) { return null; }
     public Type visit(IntegerType n) { return null; }
-    public Type visit(IdentifierType n) { return null; }
-    public Type visit(Block n) { return null; }
-    public Type visit(If n) { return null; }
-    public Type visit(While n) { return null; }
-    public Type visit(Print n) { return null; }
-    public Type visit(Assign n) { return null; }
-    public Type visit(ArrayAssign n) { return null; }
-    public Type visit(And n) { return null; }
-    public Type visit(LessThan n) { return null; }
-    public Type visit(Plus n) { return null; }
-    public Type visit(Minus n) { return null; }
-    public Type visit(Times n) { return null; }
-    public Type visit(ArrayLookup n) { return null; }
-    public Type visit(ArrayLength n) { return null; }
-    public Type visit(Call n) { return null; }
+    public Type visit(IdentifierType n) { 
+        if (phase == Phase.CHECK) {
+            if (!classes.containsKey(n.s)) {
+                error("cannot find symbol: class " + n.s);
+            }
+        }
+        return null; 
+    }
+    public Type visit(Block n) { 
+        if (phase == Phase.CHECK) {
+            for (int i = 0; i < n.sl.size(); i++) {
+                n.sl.elementAt(i).accept(this);
+            }
+        }
+        return null; 
+    }
+    public Type visit(If n) { 
+        if (phase == Phase.CHECK) {
+            n.e.accept(this);
+            n.s1.accept(this);
+            n.s2.accept(this);
+        }
+        return null; 
+    }
+    public Type visit(While n) { 
+        if (phase == Phase.CHECK) {
+            n.e.accept(this);
+            n.s.accept(this);
+        }
+        return null; 
+    }
+    public Type visit(Print n) { 
+        if (phase == Phase.CHECK) {
+            n.e.accept(this);
+        }
+        return null; 
+    }
+    public Type visit(Assign n) { 
+        if (phase == Phase.CHECK) {
+            if (getVarType(n.i.s) == null) {
+                error("cannot find symbol: variable " + n.i.s);
+            }
+            n.e.accept(this);
+        }
+        return null; 
+    }
+    public Type visit(ArrayAssign n) { 
+        if (phase == Phase.CHECK) {
+            if (getVarType(n.i.s) == null) {
+                error("cannot find symbol: variable " + n.i.s);
+            }
+            n.e1.accept(this);
+            n.e2.accept(this);
+        }
+        return null; 
+    }
+    public Type visit(And n) { 
+        if (phase == Phase.CHECK) {
+            n.e1.accept(this);
+            n.e2.accept(this);
+        }
+        return null; 
+    }
+    public Type visit(LessThan n) { 
+        if (phase == Phase.CHECK) {
+            n.e1.accept(this);
+            n.e2.accept(this);
+        }
+        return null; 
+    }
+    public Type visit(Plus n) { 
+        if (phase == Phase.CHECK) {
+            n.e1.accept(this);
+            n.e2.accept(this);
+        }
+        return null; 
+    }
+    public Type visit(Minus n) { 
+        if (phase == Phase.CHECK) {
+            n.e1.accept(this);
+            n.e2.accept(this);
+        }
+        return null; 
+    }
+    public Type visit(Times n) { 
+        if (phase == Phase.CHECK) {
+            n.e1.accept(this);
+            n.e2.accept(this);
+        }
+        return null; 
+    }
+    public Type visit(ArrayLookup n) { 
+        if (phase == Phase.CHECK) {
+            n.e1.accept(this);
+            n.e2.accept(this);
+        }
+        return null; 
+    }
+    public Type visit(ArrayLength n) { 
+        if (phase == Phase.CHECK) {
+            n.e.accept(this);
+        }
+        return null; 
+    }
+    public Type visit(Call n) { 
+        if (phase == Phase.CHECK) {
+            n.e.accept(this);
+            for (int i = 0; i < n.el.size(); i++) {
+                n.el.elementAt(i).accept(this);
+            }
+        }
+        return null; 
+    }
     public Type visit(IntegerLiteral n) { return null; }
     public Type visit(True n) { return null; }
     public Type visit(False n) { return null; }
-    public Type visit(IdentifierExp n) { return null; }
+    public Type visit(IdentifierExp n) { 
+        if (phase == Phase.CHECK) {
+            if (getVarType(n.s) == null) {
+                error("cannot find symbol: variable " + n.s);
+            }
+        }
+        return null; 
+    }
     public Type visit(This n) { return null; }
-    public Type visit(NewArray n) { return null; }
-    public Type visit(NewObject n) { return null; }
-    public Type visit(Not n) { return null; }
+    public Type visit(NewArray n) { 
+        if (phase == Phase.CHECK) {
+            n.e.accept(this);
+        }
+        return null; 
+    }
+    public Type visit(NewObject n) { 
+        if (phase == Phase.CHECK) {
+            if (!classes.containsKey(n.i.s)) {
+                error("cannot find symbol: class " + n.i.s);
+            }
+        }
+        return null; 
+    }
+    public Type visit(Not n) { 
+        if (phase == Phase.CHECK) {
+            n.e.accept(this);
+        }
+        return null; 
+    }
     public Type visit(Identifier n) { return null; }
 }
