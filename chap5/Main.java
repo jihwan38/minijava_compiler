@@ -30,6 +30,13 @@ public class Main {
                     } else {
                         System.err.println("TEST FAIL: TestDuplicate.java generated " + errorCount + " errors (expected 5).");
                     }
+                } else if (path.endsWith("TestUndeclared.java")) {
+                    int errorCount = typeChecker.getErrors().size();
+                    if (errorCount == 5) {
+                        System.out.println("TEST PASS: TestUndeclared.java successfully generated exactly 5 errors.");
+                    } else {
+                        System.err.println("TEST FAIL: TestUndeclared.java generated " + errorCount + " errors (expected 5).");
+                    }
                 }
             } catch (ParseException e) {
                 System.err.println("Parse error in " + path + ":\n" + e.toString());
