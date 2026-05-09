@@ -26,34 +26,51 @@ JavaCC 환경 같은 경우 이전 프로젝트 1과 같이 시스템 전역 환
 
 ### 3. 기호 테이블 (Symbol Table) 자료구조 설계 (✅ 완료)
 MiniJava의 타입 검사를 위한 기호 테이블(Symbol Table)의 자료구조를 설계하였다.
-교재(Modern Compiler Implementation in Java)의 5.1절에서는 범용 컴파일러를 위한 `Symbol` 및 `Table` 구조를 소개하지만, 5.2절(Type-Checking MiniJava)에서는 언어의 단순한 스코핑 룰을 감안하여 변수 식별자를 `String` 자체로 활용하는 방식을 제안하고 있다.
-이에 따라 교수님의 레퍼런스 구현 구조를 채택하여, 별도의 외부 클래스를 만들지 않고 **`TypeCheckVisitor` 클래스 내부에 정적 중첩 클래스(Static Nested Class)로 `ClassInfo`와 `MethodInfo`를 정의**하였다. 
-- 변수 메타데이터는 AST의 `syntaxtree.Type` 객체를 그대로 Value로 사용하였으며, 식별자 이름(`String`)을 Key로 하는 자바의 기본 `HashMap`과 `LinkedHashMap`(파라미터 순서 보장용)을 활용하여 전체 글로벌 맵(`classTable`)을 구축하였다.
-- 이 방식은 과도한 오버엔지니어링(예: `Optional` 남용, `Symbol` 패키지 분리)을 피하고 직관성과 유지보수성을 극대화한 정석적인 MiniJava 타입 체커 설계이다.
+교재(Modern Compiler Implementation in Java)의 5.1절에서는 범용 컴파일러를 위한 별도의 패키지 구조를 제안하지만, 컴파일러의 실용성과 자동화된 테스트(TDD)를 고려하여 교수님의 강의 자료에 제시된 최적화된 레퍼런스 구현 구조를 채택하였다.
+- 별도의 외부 클래스를 만들지 않고 **`TypeCheckVisitor` 클래스 내부에 정적 중첩 클래스(Static Nested Class)로 `ClassInfo`와 `MethodInfo`를 정의**하였다. 
+- 변수 메타데이터는 AST의 `syntaxtree.Type` 객체를 그대로 Value로 사용하였으며, 식별자 이름(`String`)을 Key로 하는 자바의 기본 `HashMap`과 메서드 파라미터의 순서를 보장하기 위한 `LinkedHashMap`을 활용하였다.
+
+### 4. 2-Pass 순회 및 에러 처리(Error Handling) 구조 구현 (✅ 완료)
+MiniJava는 선언 순서와 무관하게 클래스나 메서드를 참조할 수 있는 **전방 참조(Forward Reference)** 를 허용하므로, 1-Pass(단일 순회)로는 타입 검사가 불가능하다. 
+- 이를 해결하기 위해 `TypeCheckVisitor` 내부에 `Phase` enum (COLLECT, CHECK)을 두어, 1차 순회에서는 기호만 수집하고 2차 순회에서 실제 타입 검사를 수행하는 **2-Pass 순회 구조**를 확립하였다.
+- 또한 파싱 단계와 달리 의미 분석 단계에서는 에러를 발견해도 즉시 종료하지 않고 모든 에러를 수집해야 한다. 순회 중 발견된 에러는 `error(String msg)` 메서드를 통해 `ArrayList<String> errors`에 누적만 해 두고, 2차 순회가 모두 끝난 직후 `check()` 메서드의 마지막 단계에서 누적된 모든 에러들을 콘솔(`System.err.println`)에 일괄 출력하도록 구현하였다. 부가적으로 `Main.java`에서 검증을 수행하기 위해 에러 리스트를 반환하는 `getErrors()` 메서드를 열어두어, 특정 파일에서 의도한 개수만큼 에러가 발생하는지 TDD 방식으로 테스트할 수 있도록 하였다.
+
+### 5. 기호 테이블 데이터 삽입 헬퍼 메서드 구현 (✅ 완료)
+AST 순회 중 기호를 안전하게 테이블에 저장하기 위해, 각 스코프(Scope)를 담당하는 클래스 성격에 맞추어 전용 헬퍼 메서드를 세분화하여 구현하였다.
+
+- **`TypeCheckVisitor` 내부의 `addClass`**: 전역 스코프를 관리하므로, 전체 프로그램의 클래스 이름들을 `classes` 맵에 등록하고 중복 선언을 검사한다.
+- **`ClassInfo` 내부의 `addVar`, `addMethod`**: 단일 클래스 스코프를 담당하므로, 해당 클래스 내부에 선언되는 필드 변수(`addVar`)와 메서드(`addMethod`)를 각각의 `HashMap`에 등록하며 클래스 내 중복 선언을 차단한다.
+- **`MethodInfo` 내부의 `addParam`, `addLocal`**: 단일 메서드 스코프를 담당한다. 공식 타입 명세서(7.5절)의 `distinct` 수식에 따라 파라미터와 지역 변수 간의 이름 중복이 엄격히 금지되므로, `addLocal` 내부에서는 기존의 `params`와 `locals` 맵 양쪽을 모두 검사하도록 견고하게 구현하였다.
+
+이 헬퍼 메서드들은 이름 충돌이 발생할 경우 즉시 `false`를 반환하여, 호출부(Visitor)에서 즉각적인 `error()` 출력을 유도할 수 있도록 설계되었다.
+
+### 6. TDD(테스트 주도 개발)를 위한 자동 검증 환경 및 테스트 파일 구축 (✅ 완료)
+본격적인 `visit` 오버라이드 및 기호 수집에 앞서, 점진적 구현(TDD)을 위한 환경을 구축하였다.
+- **`TypeVisitor` 인터페이스 뼈대 완비**: 자바의 엄격한 인터페이스 규약으로 인한 컴파일 에러를 해결하기 위해, `TypeVisitor`가 요구하는 모든 AST 노드 순회용 `visit` 메서드들의 빈 껍데기(Dummy Shell)를 `TypeCheckVisitor`에 오버라이드하여 정상적으로 빌드가 가능한 상태를 확보하였다.
+- **실패 케이스 테스트 파일(`TestDuplicate.java`) 작성**: 교수님 슬라이드에 제시된 이름 중복 에러 케이스들을 모아, ①중복 필드 변수, ②중복 지역 변수, ③파라미터와 이름이 겹치는 지역 변수, ④중복 메서드, ⑤중복 클래스 등 **총 5개의 의도적인 이름 충돌 에러**를 포함하는 전용 테스트 파일을 작성하였다. (향후 선언되지 않은 변수 사용 에러나 타입 불일치를 검증하기 위한 `TestUndeclared.java`, `TestTypeMismatch.java` 등도 단계적으로 추가할 예정이다.)
+- **`Main.java` 내 자동 검증(Assertion) 로직 추가**: 여러 파일을 일괄 검사하는 `Main.java`에 로직을 추가하여, `TestDuplicate.java`를 검사할 때는 `typeChecker.getErrors().size() == 5` 조건을 검사하도록 하였다. 이를 통해 우리가 의도한 5개의 에러를 정확히 모두 잡아낼 경우에만 `TDD PASS`를 출력하게 하여, 향후 에러를 하나씩 격파해 나가는 TDD 기반의 자동 채점 환경을 완성하였다.
 
 ---
 
 ## 🚀 앞으로 진행할 구현 계획 (Implementation Plan)
 
-### 4. 에러 처리기 및 기호 수집(Collect) 헬퍼 메서드 구현
-- **목표:** `TypeCheckVisitor` 내부에 기호 테이블 조작을 위한 유틸리티 메서드를 추가한다.
-- **세부 작업:**
-  - `ErrorMsg` 클래스(또는 헬퍼 메서드)를 추가하여 "is already defined" 등의 컴파일 에러 메시지를 통일된 포맷으로 출력.
-  - `ClassInfo` 내에 `addVar()`, `addMethod()` 구현 (중복 선언 시 false 반환).
-  - `MethodInfo` 내에 `addParam()`, `addLocal()` 구현 (중복 선언 시 false 반환).
+### 7. 실패 케이스 기반의 점진적 TypeCheckVisitor 구현 (TDD 방식)
+교수님의 강의 자료에 제시된 다양한 에러 케이스들을 바탕으로, 한 번에 수천 줄을 구현하는 대신 케이스별로 하나씩 테스트하며(TDD 방식) 점진적으로 구현을 완성해 나간다.
 
-### 5. 단일 TypeCheckVisitor 순회 구현 (COLLECT / CHECK 두 단계 통합)
-- **목표:** 하나의 Visitor 클래스 안에서 AST를 순회하며 타입 검사를 완료한다.
-- **세부 작업 (Phase.COLLECT):**
-  - AST를 첫 번째로 순회하며 클래스, 메서드, 변수 선언을 `HashMap` 기반의 기호 테이블에 수집.
-  - `distinct` 제약: 선언 시 이름 중복(클래스명, 메서드명, 지역변수명 등) 검사 및 에러 출력.
-  - `noOverloading` 제약: 메서드 오버라이딩 시 부모와 시그니처가 정확히 일치하는지 검사.
-- **세부 작업 (Phase.CHECK):**
-  - 논문의 보조 함수(`fields`, `methodtype`, `isSubtype`, `acyclic`)를 프라이빗 헬퍼 메서드로 구현하여 활용.
-  - AST를 두 번째로 순회하며 공식 타입 규칙(7.6 문장, 7.7 식) 검증.
-  - 대입문(`id = e`), 메서드 호출(`p.id(...)`) 등의 서브타입(`≤`) 일치 여부 검사.
+- **Phase 1: 이름 중복 선언 방지 (distinct 제약)**
+  - **목표**: 같은 스코프 내에서 클래스, 변수, 메서드 이름이 중복 선언되는 오류 검출
+  - **작업**: AST 노드(`ClassDeclSimple`, `MethodDecl`, `VarDecl` 등)를 순회하는 `visit` 메서드를 구현하고, 앞서 만든 헬퍼 메서드를 통해 기호를 수집하며 중복 시 즉각적인 에러 메시지 출력.
+- **Phase 2: 오버로딩 시도 차단 (noOverloading 제약)**
+  - **목표**: MiniJava에서 금지된 메서드 오버로딩(파라미터 타입/개수 다름) 시도 검출
+  - **작업**: 자식 클래스가 부모 클래스의 메서드를 재정의할 때 시그니처가 정확히 일치하는지 검사하는 로직 구현.
+- **Phase 3: 상속 순환 오류 차단 (acyclic 제약)**
+  - **목표**: A가 B를 상속하고 B가 A를 상속하는 등의 순환(Cyclic) 상속 관계 검출
+  - **작업**: 명세서의 `acyclic` 보조 함수 논리를 적용하여 클래스 계층도의 무결성 검증.
+- **Phase 4: 타입 불일치 검증 (Type Checking)**
+  - **목표**: `int` 타입에 `boolean`을 대입하거나 잘못된 인자를 넘기는 등의 규칙 위반 검출
+  - **작업**: `isSubtype`, `methodtype`, `fields` 등의 보조 함수를 프라이빗 헬퍼로 구현한 뒤, 대입문(`id = e`)이나 메서드 호출식(`p.id(...)`) 등에서 서브타입(`≤`) 일치 여부를 철저히 검증.
 
-### 6. 최종 테스트 및 오류 디버깅
+### 8. 최종 테스트 및 오류 디버깅
 - **목표:** 8개의 정상 프로그램과 PDF의 모든 예외 상황(실패 예제)을 잡아내는지 테스트한다.
 - **세부 작업:**
   - `java Main ../programs/*.java` 실행 후 결과 캡처 및 보고서 완성.
