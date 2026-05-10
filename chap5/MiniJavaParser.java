@@ -21,12 +21,12 @@ public class MiniJavaParser implements MiniJavaParserConstants {
 cl.addElement(c);
     }
     jj_consume_token(0);
-{if ("" != null) return new Program(m, cl);}
+{if ("" != null) return new Program(m.line, m.column, m, cl);}
     throw new Error("Missing return statement in function");
 }
 
-  final public MainClass MainClass() throws ParseException {Identifier i1, i2; Statement s;
-    jj_consume_token(CLASS);
+  final public MainClass MainClass() throws ParseException {Identifier i1, i2; Statement s; Token t = null;
+    t = jj_consume_token(CLASS);
     i1 = Identifier();
     jj_consume_token(LBRACE);
     jj_consume_token(PUBLIC);
@@ -43,7 +43,7 @@ cl.addElement(c);
     s = Statement();
     jj_consume_token(RBRACE);
     jj_consume_token(RBRACE);
-{if ("" != null) return new MainClass(i1, i2, s);}
+{if ("" != null) return new MainClass(t.beginLine, t.beginColumn, i1, i2, s);}
     throw new Error("Missing return statement in function");
 }
 
@@ -66,7 +66,7 @@ cl.addElement(c);
     throw new Error("Missing return statement in function");
 }
 
-  final public ClassDecl ClassDeclaration() throws ParseException {Identifier i; VarDeclList vl = new VarDeclList(); VarDecl v; MethodDeclList ml = new MethodDeclList(); MethodDecl m;
+  final public ClassDecl ClassDeclaration() throws ParseException {Identifier i; VarDeclList vl = new VarDeclList(); VarDecl v; MethodDeclList ml = new MethodDeclList(); MethodDecl m; Token t = null;
     jj_consume_token(CLASS);
     i = Identifier();
     jj_consume_token(LBRACE);
@@ -101,11 +101,11 @@ vl.addElement(v);
 ml.addElement(m);
     }
     jj_consume_token(RBRACE);
-{if ("" != null) return new ClassDeclSimple(i, vl, ml);}
+{if ("" != null) return new ClassDeclSimple(t.beginLine, t.beginColumn, i, vl, ml);}
     throw new Error("Missing return statement in function");
 }
 
-  final public ClassDecl ClassExtendsDeclaration() throws ParseException {Identifier i, j; VarDeclList vl = new VarDeclList(); VarDecl v; MethodDeclList ml = new MethodDeclList(); MethodDecl m;
+  final public ClassDecl ClassExtendsDeclaration() throws ParseException {Identifier i, j; VarDeclList vl = new VarDeclList(); VarDecl v; MethodDeclList ml = new MethodDeclList(); MethodDecl m; Token t = null;
     jj_consume_token(CLASS);
     i = Identifier();
     jj_consume_token(EXTENDS);
@@ -142,7 +142,7 @@ vl.addElement(v);
 ml.addElement(m);
     }
     jj_consume_token(RBRACE);
-{if ("" != null) return new ClassDeclExtends(i, j, vl, ml);}
+{if ("" != null) return new ClassDeclExtends(t.beginLine, t.beginColumn, i, j, vl, ml);}
     throw new Error("Missing return statement in function");
 }
 
@@ -150,12 +150,12 @@ ml.addElement(m);
     t = Type();
     i = Identifier();
     jj_consume_token(SEMI);
-{if ("" != null) return new VarDecl(t, i);}
+{if ("" != null) return new VarDecl(t.line, t.column, t, i);}
     throw new Error("Missing return statement in function");
 }
 
-  final public MethodDecl MethodDeclaration() throws ParseException {Type t; Identifier i; FormalList fl = new FormalList(); VarDeclList vl = new VarDeclList(); VarDecl v; StatementList sl = new StatementList(); Statement s; Exp e;
-    jj_consume_token(PUBLIC);
+  final public MethodDecl MethodDeclaration() throws ParseException {Type t; Identifier i; FormalList fl = new FormalList(); VarDeclList vl = new VarDeclList(); VarDecl v; StatementList sl = new StatementList(); Statement s; Exp e; Token tok = null;
+    tok = jj_consume_token(PUBLIC);
     t = Type();
     i = Identifier();
     jj_consume_token(LPAREN);
@@ -204,7 +204,7 @@ sl.addElement(s);
     e = Expression();
     jj_consume_token(SEMI);
     jj_consume_token(RBRACE);
-{if ("" != null) return new MethodDecl(t, i, fl, vl, sl, e);}
+{if ("" != null) return new MethodDecl(tok.beginLine, tok.beginColumn, t, i, fl, vl, sl, e);}
     throw new Error("Missing return statement in function");
 }
 
@@ -232,7 +232,7 @@ fl.addElement(f);
   final public Formal FormalParameter() throws ParseException {Type t; Identifier i;
     t = Type();
     i = Identifier();
-{if ("" != null) return new Formal(t, i);}
+{if ("" != null) return new Formal(t.line, t.column, t, i);}
     throw new Error("Missing return statement in function");
 }
 
@@ -261,7 +261,7 @@ fl.addElement(f);
         }
       case IDENTIFIER:{
         i = Identifier();
-{if ("" != null) return new IdentifierType(i.s);}
+{if ("" != null) return new IdentifierType(i.line, i.column, i.s);}
         break;
         }
       default:
@@ -273,29 +273,29 @@ fl.addElement(f);
     throw new Error("Missing return statement in function");
 }
 
-  final public Type ArrayType() throws ParseException {
-    jj_consume_token(INT);
+  final public Type ArrayType() throws ParseException {Token t = null;
+    t = jj_consume_token(INT);
     jj_consume_token(LBRACK);
     jj_consume_token(RBRACK);
-{if ("" != null) return new IntArrayType();}
+{if ("" != null) return new IntArrayType(t.beginLine, t.beginColumn);}
     throw new Error("Missing return statement in function");
 }
 
-  final public Type BooleanType() throws ParseException {
-    jj_consume_token(BOOLEAN);
-{if ("" != null) return new BooleanType();}
+  final public Type BooleanType() throws ParseException {Token t = null;
+    t = jj_consume_token(BOOLEAN);
+{if ("" != null) return new BooleanType(t.beginLine, t.beginColumn);}
     throw new Error("Missing return statement in function");
 }
 
-  final public Type IntegerType() throws ParseException {
-    jj_consume_token(INT);
-{if ("" != null) return new IntegerType();}
+  final public Type IntegerType() throws ParseException {Token t = null;
+    t = jj_consume_token(INT);
+{if ("" != null) return new IntegerType(t.beginLine, t.beginColumn);}
     throw new Error("Missing return statement in function");
 }
 
-  final public Identifier Identifier() throws ParseException {Token t;
+  final public Identifier Identifier() throws ParseException {Token t = null;
     t = jj_consume_token(IDENTIFIER);
-{if ("" != null) return new Identifier(t.image);}
+{if ("" != null) return new Identifier(t.beginLine, t.beginColumn, t.image);}
     throw new Error("Missing return statement in function");
 }
 
@@ -315,7 +315,7 @@ fl.addElement(f);
       }
     case IDENTIFIER:{
       i = Identifier();
-e = new IdentifierExp(i.s);
+e = new IdentifierExp(i.line, i.column, i.s);
       break;
       }
     case THIS:{
@@ -349,50 +349,50 @@ e = new IdentifierExp(i.s);
     throw new Error("Missing return statement in function");
 }
 
-  final public Exp IntegerLiteral() throws ParseException {Token t;
+  final public Exp IntegerLiteral() throws ParseException {Token t = null;
     t = jj_consume_token(INTEGER_LITERAL);
-{if ("" != null) return new IntegerLiteral(Integer.parseInt(t.image));}
+{if ("" != null) return new IntegerLiteral(t.beginLine, t.beginColumn, Integer.parseInt(t.image));}
     throw new Error("Missing return statement in function");
 }
 
-  final public Exp TrueLiteral() throws ParseException {
-    jj_consume_token(TRUE);
-{if ("" != null) return new True();}
+  final public Exp TrueLiteral() throws ParseException {Token t = null;
+    t = jj_consume_token(TRUE);
+{if ("" != null) return new True(t.beginLine, t.beginColumn);}
     throw new Error("Missing return statement in function");
 }
 
-  final public Exp FalseLiteral() throws ParseException {
-    jj_consume_token(FALSE);
-{if ("" != null) return new False();}
+  final public Exp FalseLiteral() throws ParseException {Token t = null;
+    t = jj_consume_token(FALSE);
+{if ("" != null) return new False(t.beginLine, t.beginColumn);}
     throw new Error("Missing return statement in function");
 }
 
-  final public Exp ThisExpression() throws ParseException {
-    jj_consume_token(THIS);
-{if ("" != null) return new This();}
+  final public Exp ThisExpression() throws ParseException {Token t = null;
+    t = jj_consume_token(THIS);
+{if ("" != null) return new This(t.beginLine, t.beginColumn);}
     throw new Error("Missing return statement in function");
 }
 
-  final public Exp ArrayAllocationExpression() throws ParseException {Exp size;
-    jj_consume_token(NEW);
+  final public Exp ArrayAllocationExpression() throws ParseException {Exp size; Token t = null;
+    t = jj_consume_token(NEW);
     jj_consume_token(INT);
     jj_consume_token(LBRACK);
     size = Expression();
     jj_consume_token(RBRACK);
-{if ("" != null) return new NewArray(size);}
+{if ("" != null) return new NewArray(t.beginLine, t.beginColumn, size);}
     throw new Error("Missing return statement in function");
 }
 
-  final public Exp AllocationExpression() throws ParseException {Identifier i;
-    jj_consume_token(NEW);
+  final public Exp AllocationExpression() throws ParseException {Identifier i; Token t = null;
+    t = jj_consume_token(NEW);
     i = Identifier();
     jj_consume_token(LPAREN);
     jj_consume_token(RPAREN);
-{if ("" != null) return new NewObject(i);}
+{if ("" != null) return new NewObject(t.beginLine, t.beginColumn, i);}
     throw new Error("Missing return statement in function");
 }
 
-  final public Exp PostfixExpression() throws ParseException {Exp e1, e2; Identifier i; ExpList el;
+  final public Exp PostfixExpression() throws ParseException {Exp e1, e2; Identifier i; ExpList el; Token t = null;
     e1 = PrimaryExpression();
     label_9:
     while (true) {
@@ -408,20 +408,20 @@ e = new IdentifierExp(i.s);
       }
       switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
       case LBRACK:{
-        jj_consume_token(LBRACK);
+        t = jj_consume_token(LBRACK);
         e2 = Expression();
         jj_consume_token(RBRACK);
-e1 = new ArrayLookup(e1, e2);
+e1 = new ArrayLookup(t.beginLine, t.beginColumn, e1, e2);
         break;
         }
       default:
         jj_la1[14] = jj_gen;
         if (jj_2_5(2)) {
-          jj_consume_token(DOT);
+          t = jj_consume_token(DOT);
           jj_consume_token(LENGTH);
-e1 = new ArrayLength(e1);
+e1 = new ArrayLength(t.beginLine, t.beginColumn, e1);
         } else if (jj_2_6(2147483647)) {
-          jj_consume_token(DOT);
+          t = jj_consume_token(DOT);
           i = Identifier();
           jj_consume_token(LPAREN);
 el = new ExpList();
@@ -442,7 +442,7 @@ el = new ExpList();
             ;
           }
           jj_consume_token(RPAREN);
-e1 = new Call(e1, i, el);
+e1 = new Call(t.beginLine, t.beginColumn, e1, i, el);
         } else {
           jj_consume_token(-1);
           throw new ParseException();
@@ -453,7 +453,7 @@ e1 = new Call(e1, i, el);
     throw new Error("Missing return statement in function");
 }
 
-  final public Exp Expression() throws ParseException {Exp e;
+  final public Exp Expression() throws ParseException {Exp e; Token t = null;
     e = AndExpression();
 {if ("" != null) return e;}
     throw new Error("Missing return statement in function");
@@ -480,19 +480,19 @@ el.addElement(e);
     throw new Error("Missing return statement in function");
 }
 
-  final public Exp ExpressionRest() throws ParseException {Exp e;
+  final public Exp ExpressionRest() throws ParseException {Exp e; Token t = null;
     jj_consume_token(COMMA);
     e = Expression();
 {if ("" != null) return e;}
     throw new Error("Missing return statement in function");
 }
 
-  final public Exp UnaryExpression() throws ParseException {Exp e;
+  final public Exp UnaryExpression() throws ParseException {Exp e; Token t = null;
     switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
     case BANG:{
-      jj_consume_token(BANG);
+      t = jj_consume_token(BANG);
       e = UnaryExpression();
-{if ("" != null) return new Not(e);}
+{if ("" != null) return new Not(t.beginLine, t.beginColumn, e);}
       break;
       }
     case TRUE:
@@ -514,7 +514,7 @@ el.addElement(e);
     throw new Error("Missing return statement in function");
 }
 
-  final public Exp MulExpression() throws ParseException {Exp e1, e2;
+  final public Exp MulExpression() throws ParseException {Exp e1, e2; Token t = null;
     e1 = UnaryExpression();
     label_11:
     while (true) {
@@ -527,9 +527,9 @@ el.addElement(e);
         jj_la1[17] = jj_gen;
         break label_11;
       }
-      jj_consume_token(STAR);
+      t = jj_consume_token(STAR);
       e2 = UnaryExpression();
-e1 = new Times(e1, e2);
+e1 = new Times(t.beginLine, t.beginColumn, e1, e2);
     }
 {if ("" != null) return e1;}
     throw new Error("Missing return statement in function");
@@ -564,13 +564,13 @@ e1 = new Times(e1, e2);
         throw new ParseException();
       }
       e2 = MulExpression();
-if (op.kind == PLUS) e1 = new Plus(e1, e2); else e1 = new Minus(e1, e2);
+if (op.kind == PLUS) e1 = new Plus(op.beginLine, op.beginColumn, e1, e2); else e1 = new Minus(op.beginLine, op.beginColumn, e1, e2);
     }
 {if ("" != null) return e1;}
     throw new Error("Missing return statement in function");
 }
 
-  final public Exp CompareExpression() throws ParseException {Exp e1, e2;
+  final public Exp CompareExpression() throws ParseException {Exp e1, e2; Token t = null;
     e1 = AddExpression();
     label_13:
     while (true) {
@@ -583,15 +583,15 @@ if (op.kind == PLUS) e1 = new Plus(e1, e2); else e1 = new Minus(e1, e2);
         jj_la1[20] = jj_gen;
         break label_13;
       }
-      jj_consume_token(LT);
+      t = jj_consume_token(LT);
       e2 = AddExpression();
-e1 = new LessThan(e1, e2);
+e1 = new LessThan(t.beginLine, t.beginColumn, e1, e2);
     }
 {if ("" != null) return e1;}
     throw new Error("Missing return statement in function");
 }
 
-  final public Exp AndExpression() throws ParseException {Exp e1, e2;
+  final public Exp AndExpression() throws ParseException {Exp e1, e2; Token t = null;
     e1 = CompareExpression();
     label_14:
     while (true) {
@@ -604,16 +604,16 @@ e1 = new LessThan(e1, e2);
         jj_la1[21] = jj_gen;
         break label_14;
       }
-      jj_consume_token(AND);
+      t = jj_consume_token(AND);
       e2 = CompareExpression();
-e1 = new And(e1, e2);
+e1 = new And(t.beginLine, t.beginColumn, e1, e2);
     }
 {if ("" != null) return e1;}
     throw new Error("Missing return statement in function");
 }
 
-  final public Statement Block() throws ParseException {StatementList sl = new StatementList(); Statement s;
-    jj_consume_token(LBRACE);
+  final public Statement Block() throws ParseException {StatementList sl = new StatementList(); Statement s; Token t = null;
+    t = jj_consume_token(LBRACE);
     label_15:
     while (true) {
       switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
@@ -633,7 +633,7 @@ e1 = new And(e1, e2);
 sl.addElement(s);
     }
     jj_consume_token(RBRACE);
-{if ("" != null) return new Block(sl);}
+{if ("" != null) return new Block(t.beginLine, t.beginColumn, sl);}
     throw new Error("Missing return statement in function");
 }
 
@@ -674,35 +674,35 @@ sl.addElement(s);
     throw new Error("Missing return statement in function");
 }
 
-  final public Statement PrintStatement() throws ParseException {Exp e;
-    jj_consume_token(PRINTLN);
+  final public Statement PrintStatement() throws ParseException {Exp e; Token t = null;
+    t = jj_consume_token(PRINTLN);
     jj_consume_token(LPAREN);
     e = Expression();
     jj_consume_token(RPAREN);
     jj_consume_token(SEMI);
-{if ("" != null) return new Print(e);}
+{if ("" != null) return new Print(t.beginLine, t.beginColumn, e);}
     throw new Error("Missing return statement in function");
 }
 
-  final public Statement WhileStatement() throws ParseException {Exp e; Statement s;
-    jj_consume_token(WHILE);
+  final public Statement WhileStatement() throws ParseException {Exp e; Statement s; Token t = null;
+    t = jj_consume_token(WHILE);
     jj_consume_token(LPAREN);
     e = Expression();
     jj_consume_token(RPAREN);
     s = Statement();
-{if ("" != null) return new While(e, s);}
+{if ("" != null) return new While(t.beginLine, t.beginColumn, e, s);}
     throw new Error("Missing return statement in function");
 }
 
-  final public Statement IfStatement() throws ParseException {Exp e; Statement s1, s2;
-    jj_consume_token(IF);
+  final public Statement IfStatement() throws ParseException {Exp e; Statement s1, s2; Token t = null;
+    t = jj_consume_token(IF);
     jj_consume_token(LPAREN);
     e = Expression();
     jj_consume_token(RPAREN);
     s1 = Statement();
     jj_consume_token(ELSE);
     s2 = Statement();
-{if ("" != null) return new If(e, s1, s2);}
+{if ("" != null) return new If(t.beginLine, t.beginColumn, e, s1, s2);}
     throw new Error("Missing return statement in function");
 }
 
@@ -714,7 +714,7 @@ sl.addElement(s);
     jj_consume_token(ASSIGN);
     e2 = Expression();
     jj_consume_token(SEMI);
-{if ("" != null) return new ArrayAssign(i, e1, e2);}
+{if ("" != null) return new ArrayAssign(i.line, i.column, i, e1, e2);}
     throw new Error("Missing return statement in function");
 }
 
@@ -723,7 +723,7 @@ sl.addElement(s);
     jj_consume_token(ASSIGN);
     e = Expression();
     jj_consume_token(SEMI);
-{if ("" != null) return new Assign(i, e);}
+{if ("" != null) return new Assign(i.line, i.column, i, e);}
     throw new Error("Missing return statement in function");
 }
 

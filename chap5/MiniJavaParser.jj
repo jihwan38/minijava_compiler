@@ -71,18 +71,18 @@ Program Goal() :
     m=MainClass() 
     ( c=TypeDeclaration() { cl.addElement(c); } )* 
     <EOF>
-    { return new Program(m, cl); }
+    { return new Program(m.line, m.column, m, cl); }
 }
 
 MainClass MainClass() :
-{ Identifier i1, i2; Statement s; }
+{ Identifier i1, i2; Statement s; Token t = null; }
 {
-    <CLASS> i1=Identifier() <LBRACE>
+    t=<CLASS> i1=Identifier() <LBRACE>
         <PUBLIC> <STATIC> <VOID> <MAIN> <LPAREN> <STRING> <LBRACK> <RBRACK> i2=Identifier() <RPAREN> <LBRACE>
             s=Statement()
         <RBRACE>
     <RBRACE>
-    { return new MainClass(i1, i2, s); }
+    { return new MainClass(t.beginLine, t.beginColumn, i1, i2, s); }
 }
 
 ClassDecl TypeDeclaration() :
@@ -96,40 +96,40 @@ ClassDecl TypeDeclaration() :
 }
 
 ClassDecl ClassDeclaration() :
-{ Identifier i; VarDeclList vl = new VarDeclList(); VarDecl v; MethodDeclList ml = new MethodDeclList(); MethodDecl m; }
+{ Identifier i; VarDeclList vl = new VarDeclList(); VarDecl v; MethodDeclList ml = new MethodDeclList(); MethodDecl m; Token t = null; }
 {
     <CLASS> i=Identifier() <LBRACE>
         ( v=VarDeclaration() { vl.addElement(v); } )*
         ( m=MethodDeclaration() { ml.addElement(m); } )*
     <RBRACE>
-    { return new ClassDeclSimple(i, vl, ml); }
+    { return new ClassDeclSimple(t.beginLine, t.beginColumn, i, vl, ml); }
 }
 
 ClassDecl ClassExtendsDeclaration() :
-{ Identifier i, j; VarDeclList vl = new VarDeclList(); VarDecl v; MethodDeclList ml = new MethodDeclList(); MethodDecl m; }
+{ Identifier i, j; VarDeclList vl = new VarDeclList(); VarDecl v; MethodDeclList ml = new MethodDeclList(); MethodDecl m; Token t = null; }
 {
     <CLASS> i=Identifier() <EXTENDS> j=Identifier() <LBRACE>
         ( v=VarDeclaration() { vl.addElement(v); } )*
         ( m=MethodDeclaration() { ml.addElement(m); } )*
     <RBRACE>
-    { return new ClassDeclExtends(i, j, vl, ml); }
+    { return new ClassDeclExtends(t.beginLine, t.beginColumn, i, j, vl, ml); }
 }
 
 VarDecl VarDeclaration() :
 { Type t; Identifier i; }
 {
-    t=Type() i=Identifier() <SEMI> { return new VarDecl(t, i); }
+    t=Type() i=Identifier() <SEMI> { return new VarDecl(t.line, t.column, t, i); }
 }
 
 MethodDecl MethodDeclaration() :
-{ Type t; Identifier i; FormalList fl = new FormalList(); VarDeclList vl = new VarDeclList(); VarDecl v; StatementList sl = new StatementList(); Statement s; Exp e; }
+{ Type t; Identifier i; FormalList fl = new FormalList(); VarDeclList vl = new VarDeclList(); VarDecl v; StatementList sl = new StatementList(); Statement s; Exp e; Token tok = null; }
 {
-    <PUBLIC> t=Type() i=Identifier() <LPAREN> [ fl=FormalParameterList() ] <RPAREN> <LBRACE>
+    tok=<PUBLIC> t=Type() i=Identifier() <LPAREN> [ fl=FormalParameterList() ] <RPAREN> <LBRACE>
         ( LOOKAHEAD(2) v=VarDeclaration() { vl.addElement(v); } )*
         ( s=Statement() { sl.addElement(s); } )*
         <RETURN> e=Expression() <SEMI>
     <RBRACE>
-    { return new MethodDecl(t, i, fl, vl, sl, e); }
+    { return new MethodDecl(tok.beginLine, tok.beginColumn, t, i, fl, vl, sl, e); }
 }
 
 FormalList FormalParameterList() :
@@ -143,7 +143,7 @@ FormalList FormalParameterList() :
 Formal FormalParameter() :
 { Type t; Identifier i; }
 {
-    t=Type() i=Identifier() { return new Formal(t, i); }
+    t=Type() i=Identifier() { return new Formal(t.line, t.column, t, i); }
 }
 
 Formal FormalParameterRest() :
@@ -158,32 +158,32 @@ Type Type() :
       LOOKAHEAD(3) t=ArrayType() { return t; }
     | t=BooleanType() { return t; }
     | t=IntegerType() { return t; }
-    | i=Identifier() { return new IdentifierType(i.s); }
+    | i=Identifier() { return new IdentifierType(i.line, i.column, i.s); }
 }
 
 Type ArrayType() :
-{}
+{ Token t = null; }
 {
-    <INT> <LBRACK> <RBRACK> { return new IntArrayType(); }
+    t=<INT> <LBRACK> <RBRACK> { return new IntArrayType(t.beginLine, t.beginColumn); }
 }
 
 Type BooleanType() :
-{}
+{ Token t = null; }
 {
-    <BOOLEAN> { return new BooleanType(); }
+    t=<BOOLEAN> { return new BooleanType(t.beginLine, t.beginColumn); }
 }
 
 Type IntegerType() :
-{}
+{ Token t = null; }
 {
-    <INT> { return new IntegerType(); }
+    t=<INT> { return new IntegerType(t.beginLine, t.beginColumn); }
 }
 
 Identifier Identifier() :
-{ Token t; }
+{ Token t = null; }
 {
     t = <IDENTIFIER>
-    { return new Identifier(t.image); }
+    { return new Identifier(t.beginLine, t.beginColumn, t.image); }
 }
 
 
@@ -194,7 +194,7 @@ Exp PrimaryExpression() :
       e=IntegerLiteral()
     | e=TrueLiteral()
     | e=FalseLiteral()
-    | i=Identifier() { e = new IdentifierExp(i.s); }
+    | i=Identifier() { e = new IdentifierExp(i.line, i.column, i.s); }
     | e=ThisExpression()
     | LOOKAHEAD(3) e=ArrayAllocationExpression()
     | e=AllocationExpression()
@@ -204,59 +204,59 @@ Exp PrimaryExpression() :
 }
 
 Exp IntegerLiteral() : 
-{ Token t; }
+{ Token t = null; }
 {
     t = <INTEGER_LITERAL>
-    { return new IntegerLiteral(Integer.parseInt(t.image)); }
+    { return new IntegerLiteral(t.beginLine, t.beginColumn, Integer.parseInt(t.image)); }
 }
 
 Exp TrueLiteral() : 
-{}
+{ Token t = null; }
 {
-    <TRUE> { return new True(); }
+    t=<TRUE> { return new True(t.beginLine, t.beginColumn); }
 }
 
 Exp FalseLiteral() : 
-{}
+{ Token t = null; }
 {
-    <FALSE> { return new False(); }
+    t=<FALSE> { return new False(t.beginLine, t.beginColumn); }
 }
 
 Exp ThisExpression() : 
-{}
+{ Token t = null; }
 {
-    <THIS> { return new This(); }
+    t=<THIS> { return new This(t.beginLine, t.beginColumn); }
 }
 
 Exp ArrayAllocationExpression() : 
-{ Exp size; }
+{ Exp size; Token t = null; }
 {
-    <NEW> <INT> <LBRACK> size=Expression() <RBRACK> { return new NewArray(size); }
+    t=<NEW> <INT> <LBRACK> size=Expression() <RBRACK> { return new NewArray(t.beginLine, t.beginColumn, size); }
 }
 
 Exp AllocationExpression() : 
-{ Identifier i; }
+{ Identifier i; Token t = null; }
 {
-    <NEW> i=Identifier() <LPAREN> <RPAREN> { return new NewObject(i); }
+    t=<NEW> i=Identifier() <LPAREN> <RPAREN> { return new NewObject(t.beginLine, t.beginColumn, i); }
 }
 
 Exp PostfixExpression() :
-{ Exp e1, e2; Identifier i; ExpList el; }
+{ Exp e1, e2; Identifier i; ExpList el; Token t = null; }
 {
     e1=PrimaryExpression()
 
     (
-          <LBRACK> e2=Expression() <RBRACK> { e1 = new ArrayLookup(e1, e2); }
-        | LOOKAHEAD(2) <DOT> <LENGTH> { e1 = new ArrayLength(e1); }
-        | LOOKAHEAD( <DOT> Identifier() <LPAREN> ) <DOT> i=Identifier() <LPAREN> 
+          t=<LBRACK> e2=Expression() <RBRACK> { e1 = new ArrayLookup(t.beginLine, t.beginColumn, e1, e2); }
+        | LOOKAHEAD(2) t=<DOT> <LENGTH> { e1 = new ArrayLength(t.beginLine, t.beginColumn, e1); }
+        | LOOKAHEAD( <DOT> Identifier() <LPAREN> ) t=<DOT> i=Identifier() <LPAREN> 
           { el = new ExpList(); } [ el=ExpressionList() ] 
-          <RPAREN> { e1 = new Call(e1, i, el); }
+          <RPAREN> { e1 = new Call(t.beginLine, t.beginColumn, e1, i, el); }
     )*
     { return e1; }
 }
 
 Exp Expression() : 
-{ Exp e; }
+{ Exp e; Token t = null; }
 {
     e=AndExpression() { return e; }
 }
@@ -270,22 +270,22 @@ ExpList ExpressionList() :
 }
 
 Exp ExpressionRest() : 
-{ Exp e; }
+{ Exp e; Token t = null; }
 {
     <COMMA> e=Expression() { return e; }
 }
 
 Exp UnaryExpression() :
-{ Exp e; }
+{ Exp e; Token t = null; }
 {
-      <BANG> e=UnaryExpression() { return new Not(e); }
+      t=<BANG> e=UnaryExpression() { return new Not(t.beginLine, t.beginColumn, e); }
     | e=PostfixExpression() { return e; }
 }
 
 Exp MulExpression() :
-{ Exp e1, e2; }
+{ Exp e1, e2; Token t = null; }
 {
-    e1=UnaryExpression() ( <STAR> e2=UnaryExpression() { e1 = new Times(e1, e2); } )*
+    e1=UnaryExpression() ( t=<STAR> e2=UnaryExpression() { e1 = new Times(t.beginLine, t.beginColumn, e1, e2); } )*
     { return e1; }
 }
 
@@ -294,29 +294,29 @@ Exp AddExpression() :
 {
     e1=MulExpression() 
     ( (op=<PLUS> | op=<MINUS>) e2=MulExpression() 
-      { if (op.kind == PLUS) e1 = new Plus(e1, e2); else e1 = new Minus(e1, e2); } )*
+      { if (op.kind == PLUS) e1 = new Plus(op.beginLine, op.beginColumn, e1, e2); else e1 = new Minus(op.beginLine, op.beginColumn, e1, e2); } )*
     { return e1; }
 }
 
 Exp CompareExpression() :
-{ Exp e1, e2; }
+{ Exp e1, e2; Token t = null; }
 {
-    e1=AddExpression() ( <LT> e2=AddExpression() { e1 = new LessThan(e1, e2); } )*
+    e1=AddExpression() ( t=<LT> e2=AddExpression() { e1 = new LessThan(t.beginLine, t.beginColumn, e1, e2); } )*
     { return e1; }
 }
 
 Exp AndExpression() :
-{ Exp e1, e2; }
+{ Exp e1, e2; Token t = null; }
 {
-    e1=CompareExpression() ( <AND> e2=CompareExpression() { e1 = new And(e1, e2); } )*
+    e1=CompareExpression() ( t=<AND> e2=CompareExpression() { e1 = new And(t.beginLine, t.beginColumn, e1, e2); } )*
     { return e1; }
 }
 
 Statement Block() :
-{ StatementList sl = new StatementList(); Statement s; }
+{ StatementList sl = new StatementList(); Statement s; Token t = null; }
 {
-    <LBRACE> ( s=Statement() { sl.addElement(s); } )* <RBRACE>
-    { return new Block(sl); }
+    t=<LBRACE> ( s=Statement() { sl.addElement(s); } )* <RBRACE>
+    { return new Block(t.beginLine, t.beginColumn, sl); }
 }
 
 Statement Statement() :
@@ -334,37 +334,37 @@ Statement Statement() :
 }
 
 Statement PrintStatement() :
-{ Exp e; }
+{ Exp e; Token t = null; }
 {
-    <PRINTLN> <LPAREN> e=Expression() <RPAREN> <SEMI>
-    { return new Print(e); }
+    t=<PRINTLN> <LPAREN> e=Expression() <RPAREN> <SEMI>
+    { return new Print(t.beginLine, t.beginColumn, e); }
 }
 
 Statement WhileStatement() :
-{ Exp e; Statement s; }
+{ Exp e; Statement s; Token t = null; }
 {
-    <WHILE> <LPAREN> e=Expression() <RPAREN> s=Statement()
-    { return new While(e, s); }
+    t=<WHILE> <LPAREN> e=Expression() <RPAREN> s=Statement()
+    { return new While(t.beginLine, t.beginColumn, e, s); }
 }
 
 Statement IfStatement() :
-{ Exp e; Statement s1, s2; }
+{ Exp e; Statement s1, s2; Token t = null; }
 {
-    <IF> <LPAREN> e=Expression() <RPAREN> s1=Statement() <ELSE> s2=Statement()
-    { return new If(e, s1, s2); }
+    t=<IF> <LPAREN> e=Expression() <RPAREN> s1=Statement() <ELSE> s2=Statement()
+    { return new If(t.beginLine, t.beginColumn, e, s1, s2); }
 }
 
 Statement ArrayAssignmentStatement() :
 { Identifier i; Exp e1, e2; }
 {
     i=Identifier() <LBRACK> e1=Expression() <RBRACK> <ASSIGN> e2=Expression() <SEMI>
-    { return new ArrayAssign(i, e1, e2); }
+    { return new ArrayAssign(i.line, i.column, i, e1, e2); }
 }
 
 Statement AssignmentStatement() :
 { Identifier i; Exp e; }
 {
     i=Identifier() <ASSIGN> e=Expression() <SEMI>
-    { return new Assign(i, e); }
+    { return new Assign(i.line, i.column, i, e); }
 }
 
