@@ -215,6 +215,15 @@ public class TypeCheckVisitor implements TypeVisitor {
         return null;
     }
 
+    private String typeToString(Type t) {
+        if (t == null) return "unknown";
+        if (t instanceof IntegerType) return "int";
+        if (t instanceof BooleanType) return "boolean";
+        if (t instanceof IntArrayType) return "int[]";
+        if (t instanceof IdentifierType) return ((IdentifierType)t).s;
+        return "unknown";
+    }
+
     public Type visit(Program n) { 
         n.m.accept(this);
         for (int i = 0; i < n.cl.size(); i++) {
@@ -337,7 +346,7 @@ public class TypeCheckVisitor implements TypeVisitor {
             }
             Type retType = n.e.accept(this);
             if (retType != null && !isSubtype(retType, n.t)) {
-                error("incompatible types");
+                error("incompatible types: " + typeToString(retType) + " cannot be converted to " + typeToString(n.t));
             }
             currentMethod = null;
         }
@@ -376,7 +385,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(If n) { 
         if (phase == Phase.CHECK) {
             Type cond = n.e.accept(this);
-            if (cond != null && !(cond instanceof BooleanType)) error("incompatible types");
+            if (cond != null && !(cond instanceof BooleanType)) error("incompatible types: " + typeToString(cond) + " cannot be converted to boolean");
             n.s1.accept(this);
             n.s2.accept(this);
         }
@@ -385,7 +394,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(While n) { 
         if (phase == Phase.CHECK) {
             Type cond = n.e.accept(this);
-            if (cond != null && !(cond instanceof BooleanType)) error("incompatible types");
+            if (cond != null && !(cond instanceof BooleanType)) error("incompatible types: " + typeToString(cond) + " cannot be converted to boolean");
             n.s.accept(this);
         }
         return null; 
@@ -393,7 +402,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(Print n) { 
         if (phase == Phase.CHECK) {
             Type t = n.e.accept(this);
-            if (t != null && !(t instanceof IntegerType)) error("incompatible types");
+            if (t != null && !(t instanceof IntegerType)) error("incompatible types: " + typeToString(t) + " cannot be converted to int");
         }
         return null; 
     }
@@ -405,7 +414,7 @@ public class TypeCheckVisitor implements TypeVisitor {
             }
             Type expType = n.e.accept(this);
             if (varType != null && expType != null && !isSubtype(expType, varType)) {
-                error("incompatible types");
+                error("incompatible types: " + typeToString(expType) + " cannot be converted to " + typeToString(varType));
             }
         }
         return null; 
@@ -419,9 +428,9 @@ public class TypeCheckVisitor implements TypeVisitor {
                 error("array required, but non-array found");
             }
             Type indexType = n.e1.accept(this);
-            if (indexType != null && !(indexType instanceof IntegerType)) error("incompatible types");
+            if (indexType != null && !(indexType instanceof IntegerType)) error("incompatible types: " + typeToString(indexType) + " cannot be converted to int");
             Type valueType = n.e2.accept(this);
-            if (valueType != null && !(valueType instanceof IntegerType)) error("incompatible types");
+            if (valueType != null && !(valueType instanceof IntegerType)) error("incompatible types: " + typeToString(valueType) + " cannot be converted to int");
         }
         return null; 
     }
@@ -475,7 +484,7 @@ public class TypeCheckVisitor implements TypeVisitor {
             Type t1 = n.e1.accept(this);
             Type t2 = n.e2.accept(this);
             if (t1 != null && !(t1 instanceof IntArrayType)) error("array required, but non-array found");
-            if (t2 != null && !(t2 instanceof IntegerType)) error("incompatible types");
+            if (t2 != null && !(t2 instanceof IntegerType)) error("incompatible types: " + typeToString(t2) + " cannot be converted to int");
         }
         return new IntegerType(); 
     }
@@ -509,7 +518,7 @@ public class TypeCheckVisitor implements TypeVisitor {
                 for (Type paramType : mInfo.params.values()) {
                     Type argType = n.el.elementAt(i).accept(this);
                     if (argType != null && !isSubtype(argType, paramType)) {
-                        error("incompatible types");
+                        error("incompatible types: " + typeToString(argType) + " cannot be converted to " + typeToString(paramType));
                     }
                     i++;
                 }
@@ -540,7 +549,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(NewArray n) { 
         if (phase == Phase.CHECK) {
             Type t = n.e.accept(this);
-            if (t != null && !(t instanceof IntegerType)) error("incompatible types");
+            if (t != null && !(t instanceof IntegerType)) error("incompatible types: " + typeToString(t) + " cannot be converted to int");
         }
         return new IntArrayType(); 
     }
