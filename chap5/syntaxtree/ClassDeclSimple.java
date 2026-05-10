@@ -3,8 +3,7 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class ClassDeclSimple extends ClassDecl {
-  public int line;
-  public int column;
+
   public Identifier i;
   public VarDeclList vl;  
   public MethodDeclList ml;

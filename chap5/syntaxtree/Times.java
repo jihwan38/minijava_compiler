@@ -3,8 +3,7 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class Times extends Exp {
-  public int line;
-  public int column;
+
   public Exp e1,e2;
   
   public Times(int l, int c, Exp ae1, Exp ae2) {

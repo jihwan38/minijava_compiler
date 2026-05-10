@@ -3,8 +3,7 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class True extends Exp {
-  public int line;
-  public int column;
+
   public True(int l, int c) { line = l; column = c; }
   public void accept(Visitor v) {
     v.visit(this);

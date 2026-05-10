@@ -3,8 +3,7 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class Minus extends Exp {
-  public int line;
-  public int column;
+
   public Exp e1,e2;
   
   public Minus(int l, int c, Exp ae1, Exp ae2) {

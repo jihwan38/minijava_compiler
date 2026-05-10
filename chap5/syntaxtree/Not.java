@@ -3,8 +3,7 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class Not extends Exp {
-  public int line;
-  public int column;
+
   public Exp e;
   
   public Not(int l, int c, Exp ae) {

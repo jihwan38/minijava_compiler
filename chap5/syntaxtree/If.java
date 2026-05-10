@@ -3,8 +3,7 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class If extends Statement {
-  public int line;
-  public int column;
+
   public Exp e;
   public Statement s1,s2;
 

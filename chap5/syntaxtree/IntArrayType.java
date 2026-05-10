@@ -3,8 +3,7 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class IntArrayType extends Type {
-  public int line;
-  public int column;
+
   public IntArrayType(int l, int c) { line = l; column = c; }
   public void accept(Visitor v) {
     v.visit(this);

@@ -47,17 +47,17 @@ public class TypeCheckVisitor implements TypeVisitor {
         }
     }
 
-    private void error(String msg) {
-        errors.add(currentFileName + ": error: " + msg);
-    }
-
     public static class MethodInfo {
+        int line;
+        int col;
         String name;
         Type returnType;
         LinkedHashMap<String, Type> params = new LinkedHashMap<>();
         HashMap<String, Type> locals = new HashMap<>();
 
-        public MethodInfo(String name, Type returnType) {
+        public MethodInfo(int line, int col, String name, Type returnType) {
+            this.line = line;
+            this.col = col;
             this.name = name;
             this.returnType = returnType;
         }
@@ -92,6 +92,8 @@ public class TypeCheckVisitor implements TypeVisitor {
     }
 
     public static class ClassInfo {
+        int line;
+        int col;
         String name;
         String parent; 
         HashMap<String, Type> fields = new HashMap<>();
@@ -110,9 +112,11 @@ public class TypeCheckVisitor implements TypeVisitor {
         }
     }
 
-    public boolean addClass(String id, String parent) {
+    public boolean addClass(int line, int col, String id, String parent) {
         if (classes.containsKey(id)) return false;
         ClassInfo c = new ClassInfo();
+        c.line = line;
+        c.col = col;
         c.name = id;
         c.parent = parent;
         classes.put(id, c);
@@ -171,7 +175,7 @@ public class TypeCheckVisitor implements TypeVisitor {
                 }
                 
                 if (!isMatch) {
-                    error("method " + m.name + " in class " + c.name + " illegally overloads method in class " + parentClass.name);
+                    error(m.line, m.col, "method " + m.name + " in class " + c.name + " illegally overloads method in class " + parentClass.name);
                 }
                 return;
             }
@@ -191,7 +195,7 @@ public class TypeCheckVisitor implements TypeVisitor {
         String currentParent = c.parent;
         while (currentParent != null) {
             if (visited.contains(currentParent)) {
-                error("cyclic inheritance involving class " + c.name);
+                error(c.line, c.col, "cyclic inheritance involving class " + c.name);
                 return;
             }
             visited.add(currentParent);
@@ -248,7 +252,7 @@ public class TypeCheckVisitor implements TypeVisitor {
 
     public Type visit(MainClass n) { 
         if (phase == Phase.COLLECT) {
-            if (!addClass(n.i1.s, null)) {
+            if (!addClass(n.line, n.column, n.i1.s, null)) {
                 error(n.line, n.column, "class " + n.i1.s + " is already defined");
             }
         } else {
@@ -259,7 +263,7 @@ public class TypeCheckVisitor implements TypeVisitor {
 
     public Type visit(ClassDeclSimple n) { 
         if (phase == Phase.COLLECT) {
-            if (!addClass(n.i.s, null)) {
+            if (!addClass(n.line, n.column, n.i.s, null)) {
                 error(n.line, n.column, "class " + n.i.s + " is already defined");
             }
             currentClass = classes.get(n.i.s);
@@ -285,7 +289,7 @@ public class TypeCheckVisitor implements TypeVisitor {
 
     public Type visit(ClassDeclExtends n) { 
         if (phase == Phase.COLLECT) {
-            if (!addClass(n.i.s, n.j.s)) {
+            if (!addClass(n.line, n.column, n.i.s, n.j.s)) {
                 error(n.line, n.column, "class " + n.i.s + " is already defined");
             }
             currentClass = classes.get(n.i.s);
@@ -332,7 +336,7 @@ public class TypeCheckVisitor implements TypeVisitor {
 
     public Type visit(MethodDecl n) { 
         if (phase == Phase.COLLECT) {
-            MethodInfo m = new MethodInfo(n.i.s, n.t);
+            MethodInfo m = new MethodInfo(n.line, n.column, n.i.s, n.t);
             if (!currentClass.addMethod(n.i.s, m)) {
                 error(n.line, n.column, "method " + n.i.s + " is already defined in class " + currentClass.name);
             }

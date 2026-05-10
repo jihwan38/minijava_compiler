@@ -3,8 +3,7 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class ArrayAssign extends Statement {
-  public int line;
-  public int column;
+
   public Identifier i;
   public Exp e1,e2;
 

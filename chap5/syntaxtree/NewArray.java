@@ -3,8 +3,7 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class NewArray extends Exp {
-  public int line;
-  public int column;
+
   public Exp e;
   
   public NewArray(int l, int c, Exp ae) {

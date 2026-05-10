@@ -3,8 +3,7 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class IntegerLiteral extends Exp {
-  public int line;
-  public int column;
+
   public int i;
 
   public IntegerLiteral(int l, int c, int ai) {
