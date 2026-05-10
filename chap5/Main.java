@@ -9,7 +9,7 @@ public class Main {
                 MiniJavaParser parser = new MiniJavaParser(in);
                 Program root = parser.Goal();
                 
-                // root.accept(new PrettyPrintVisitor()); 
+                root.accept(new PrettyPrintVisitor()); 
                 //System.out.println("Successfully parsed for " + path);
 
 
