@@ -98,7 +98,7 @@ ClassDecl TypeDeclaration() :
 ClassDecl ClassDeclaration() :
 { Identifier i; VarDeclList vl = new VarDeclList(); VarDecl v; MethodDeclList ml = new MethodDeclList(); MethodDecl m; Token t = null; }
 {
-    <CLASS> i=Identifier() <LBRACE>
+    t=<CLASS> i=Identifier() <LBRACE>
         ( v=VarDeclaration() { vl.addElement(v); } )*
         ( m=MethodDeclaration() { ml.addElement(m); } )*
     <RBRACE>
@@ -108,7 +108,7 @@ ClassDecl ClassDeclaration() :
 ClassDecl ClassExtendsDeclaration() :
 { Identifier i, j; VarDeclList vl = new VarDeclList(); VarDecl v; MethodDeclList ml = new MethodDeclList(); MethodDecl m; Token t = null; }
 {
-    <CLASS> i=Identifier() <EXTENDS> j=Identifier() <LBRACE>
+    t=<CLASS> i=Identifier() <EXTENDS> j=Identifier() <LBRACE>
         ( v=VarDeclaration() { vl.addElement(v); } )*
         ( m=MethodDeclaration() { ml.addElement(m); } )*
     <RBRACE>

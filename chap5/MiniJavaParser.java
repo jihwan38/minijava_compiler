@@ -67,7 +67,7 @@ cl.addElement(c);
 }
 
   final public ClassDecl ClassDeclaration() throws ParseException {Identifier i; VarDeclList vl = new VarDeclList(); VarDecl v; MethodDeclList ml = new MethodDeclList(); MethodDecl m; Token t = null;
-    jj_consume_token(CLASS);
+    t = jj_consume_token(CLASS);
     i = Identifier();
     jj_consume_token(LBRACE);
     label_2:
@@ -106,7 +106,7 @@ ml.addElement(m);
 }
 
   final public ClassDecl ClassExtendsDeclaration() throws ParseException {Identifier i, j; VarDeclList vl = new VarDeclList(); VarDecl v; MethodDeclList ml = new MethodDeclList(); MethodDecl m; Token t = null;
-    jj_consume_token(CLASS);
+    t = jj_consume_token(CLASS);
     i = Identifier();
     jj_consume_token(EXTENDS);
     j = Identifier();

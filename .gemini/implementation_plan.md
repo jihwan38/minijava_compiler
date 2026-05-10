@@ -120,7 +120,10 @@ AST 순회 중 기호를 안전하게 테이블에 저장하기 위해, 각 스�
    - JavaCC 문법 규칙(Production Rules)을 전면 수정하여, 34개의 모든 AST 노드가 생성되는 시점에 해당 구문의 핵심 토큰(`Token t`)을 낚아채도록 구현하였다. (예: `While` 노드는 `t=<WHILE>`, `If` 노드는 `t=<IF>`)
    - 추출한 토큰의 `t.beginLine`과 `t.beginColumn` 정보를 각 AST 노드의 생성자에 파라미터로 주입하여, 파싱 즉시 위치 정보가 노드 내부에 영구적으로 저장되도록 설계하였다.
    - 자바 컴파일러의 로컬 변수 초기화 검사(Initialization Check)를 우회하기 위해, 선언부에 단순히 `Token t;` 가 아닌 `Token t = null;` 형태로 선언하여 다형성 에러 및 초기화 에러를 완벽하게 방지하는 등 세밀한 예외 처리를 적용하였다.
-3) **방문자 에러 리포팅 수정 (`TypeCheckVisitor.java`)**: 기존의 `error(String msg)` 헬퍼 메서드를 `error(int line, int col, String msg)` 형태로 업그레이드하고, 모든 `visit` 메서드에서 에러 발생 시 노드에 저장된 라인 번호를 꺼내어 `[파일명]:[줄번호]: error: [메시지]` 포맷으로 출력하게끔 수정한다.
+3) **에러 리포팅 포맷 고도화 및 Main 연동 (`TypeCheckVisitor.java`, `Main.java`) (✅ 완료)**: 
+   - `TypeCheckVisitor.java` 내부의 `error` 헬퍼 메서드를 오버로딩하여 `error(int line, int col, String msg)`를 새롭게 정의하였다. 이를 통해 실제 `javac` 컴파일러와 100% 동일한 `[파일명]:[줄번호]:[칸번호]: error: [메시지]` 포맷을 완벽하게 재현하였다.
+   - 자체 제작한 자바 정규식 스크립트(`PatchVisitor.java`)를 활용하여, 수십 개의 `visit` 메서드 내부에 산재해 있던 기존 `error(msg)` 호출부들을 모두 `error(n.line, n.column, msg)` 형태로 자동 치환하여 안전하고 빠르게 마이그레이션하였다. (단, 특정 노드 위치를 가리킬 수 없는 순환 상속 등 일부 에러는 기존 헬퍼를 유지하도록 다형성을 살림)
+   - `Main.java`의 일괄 테스트(for) 루프를 수정하여, 파싱 성공 직후 `typeChecker.setFileName(new java.io.File(path).getName())`를 호출하도록 구현하였다. 이로써 다중 파일을 검사할 때에도 각 에러가 어느 소스 코드에서 발생했는지 정확하게 매핑되는 완벽한 진단 시스템을 완성하였다.
 
 ### 14. 최종 테스트 및 오류 디버깅
 - **목표:** 8개의 정상 프로그램과 PDF의 모든 예외 상황(실패 예제)을 잡아내는지 테스트한다.

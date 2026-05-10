@@ -33,8 +33,22 @@ public class TypeCheckVisitor implements TypeVisitor {
         return errors.isEmpty();
     }
 
+    private String currentFileName = "unknown";
+    
+    public void setFileName(String fileName) {
+        this.currentFileName = fileName;
+    }
+
+    private void error(int line, int col, String msg) {
+        if (line > 0 && col > 0) {
+            errors.add(currentFileName + ":" + line + ":" + col + ": error: " + msg);
+        } else {
+            errors.add(currentFileName + ": error: " + msg);
+        }
+    }
+
     private void error(String msg) {
-        errors.add(msg);
+        errors.add(currentFileName + ": error: " + msg);
     }
 
     public static class MethodInfo {
@@ -235,7 +249,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(MainClass n) { 
         if (phase == Phase.COLLECT) {
             if (!addClass(n.i1.s, null)) {
-                error("class " + n.i1.s + " is already defined");
+                error(n.line, n.column, "class " + n.i1.s + " is already defined");
             }
         } else {
             n.s.accept(this);
@@ -246,7 +260,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(ClassDeclSimple n) { 
         if (phase == Phase.COLLECT) {
             if (!addClass(n.i.s, null)) {
-                error("class " + n.i.s + " is already defined");
+                error(n.line, n.column, "class " + n.i.s + " is already defined");
             }
             currentClass = classes.get(n.i.s);
             for (int i = 0; i < n.vl.size(); i++) {
@@ -272,7 +286,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(ClassDeclExtends n) { 
         if (phase == Phase.COLLECT) {
             if (!addClass(n.i.s, n.j.s)) {
-                error("class " + n.i.s + " is already defined");
+                error(n.line, n.column, "class " + n.i.s + " is already defined");
             }
             currentClass = classes.get(n.i.s);
             for (int i = 0; i < n.vl.size(); i++) {
@@ -284,7 +298,7 @@ public class TypeCheckVisitor implements TypeVisitor {
             currentClass = null;
         } else {
             if (!classes.containsKey(n.j.s)) {
-                error("cannot find symbol: class " + n.j.s);
+                error(n.line, n.column, "cannot find symbol: class " + n.j.s);
             }
             currentClass = classes.get(n.i.s);
             checkAcyclic(currentClass);
@@ -303,11 +317,11 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.COLLECT) {
             if (currentMethod != null) {
                 if (!currentMethod.addLocal(n.i.s, n.t)) {
-                    error("variable " + n.i.s + " is already defined in method " + currentMethod.getSignature());
+                    error(n.line, n.column, "variable " + n.i.s + " is already defined in method " + currentMethod.getSignature());
                 }
             } else if (currentClass != null) {
                 if (!currentClass.addVar(n.i.s, n.t)) {
-                    error("variable " + n.i.s + " is already defined in class " + currentClass.name);
+                    error(n.line, n.column, "variable " + n.i.s + " is already defined in class " + currentClass.name);
                 }
             }
         } else {
@@ -320,7 +334,7 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.COLLECT) {
             MethodInfo m = new MethodInfo(n.i.s, n.t);
             if (!currentClass.addMethod(n.i.s, m)) {
-                error("method " + n.i.s + " is already defined in class " + currentClass.name);
+                error(n.line, n.column, "method " + n.i.s + " is already defined in class " + currentClass.name);
             }
             currentMethod = m;
             n.t.accept(this);
@@ -346,7 +360,7 @@ public class TypeCheckVisitor implements TypeVisitor {
             }
             Type retType = n.e.accept(this);
             if (retType != null && !isSubtype(retType, n.t)) {
-                error("incompatible types: " + typeToString(retType) + " cannot be converted to " + typeToString(n.t));
+                error(n.line, n.column, "incompatible types: " + typeToString(retType) + " cannot be converted to " + typeToString(n.t));
             }
             currentMethod = null;
         }
@@ -356,7 +370,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(Formal n) { 
         if (phase == Phase.COLLECT) {
             if (!currentMethod.addParam(n.i.s, n.t)) {
-                error("variable " + n.i.s + " is already defined in method " + currentMethod.getSignature());
+                error(n.line, n.column, "variable " + n.i.s + " is already defined in method " + currentMethod.getSignature());
             }
         } else {
             n.t.accept(this);
@@ -369,7 +383,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(IdentifierType n) { 
         if (phase == Phase.CHECK) {
             if (!classes.containsKey(n.s)) {
-                error("cannot find symbol: class " + n.s);
+                error(n.line, n.column, "cannot find symbol: class " + n.s);
             }
         }
         return null; 
@@ -385,7 +399,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(If n) { 
         if (phase == Phase.CHECK) {
             Type cond = n.e.accept(this);
-            if (cond != null && !(cond instanceof BooleanType)) error("incompatible types: " + typeToString(cond) + " cannot be converted to boolean");
+            if (cond != null && !(cond instanceof BooleanType)) error(n.line, n.column, "incompatible types: " + typeToString(cond) + " cannot be converted to boolean");
             n.s1.accept(this);
             n.s2.accept(this);
         }
@@ -394,7 +408,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(While n) { 
         if (phase == Phase.CHECK) {
             Type cond = n.e.accept(this);
-            if (cond != null && !(cond instanceof BooleanType)) error("incompatible types: " + typeToString(cond) + " cannot be converted to boolean");
+            if (cond != null && !(cond instanceof BooleanType)) error(n.line, n.column, "incompatible types: " + typeToString(cond) + " cannot be converted to boolean");
             n.s.accept(this);
         }
         return null; 
@@ -402,7 +416,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(Print n) { 
         if (phase == Phase.CHECK) {
             Type t = n.e.accept(this);
-            if (t != null && !(t instanceof IntegerType)) error("incompatible types: " + typeToString(t) + " cannot be converted to int");
+            if (t != null && !(t instanceof IntegerType)) error(n.line, n.column, "incompatible types: " + typeToString(t) + " cannot be converted to int");
         }
         return null; 
     }
@@ -410,11 +424,11 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.CHECK) {
             Type varType = getVarType(n.i.s);
             if (varType == null) {
-                error("cannot find symbol: variable " + n.i.s);
+                error(n.line, n.column, "cannot find symbol: variable " + n.i.s);
             }
             Type expType = n.e.accept(this);
             if (varType != null && expType != null && !isSubtype(expType, varType)) {
-                error("incompatible types: " + typeToString(expType) + " cannot be converted to " + typeToString(varType));
+                error(n.line, n.column, "incompatible types: " + typeToString(expType) + " cannot be converted to " + typeToString(varType));
             }
         }
         return null; 
@@ -423,14 +437,14 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.CHECK) {
             Type varType = getVarType(n.i.s);
             if (varType == null) {
-                error("cannot find symbol: variable " + n.i.s);
+                error(n.line, n.column, "cannot find symbol: variable " + n.i.s);
             } else if (!(varType instanceof IntArrayType)) {
-                error("array required, but non-array found");
+                error(n.line, n.column, "array required, but non-array found");
             }
             Type indexType = n.e1.accept(this);
-            if (indexType != null && !(indexType instanceof IntegerType)) error("incompatible types: " + typeToString(indexType) + " cannot be converted to int");
+            if (indexType != null && !(indexType instanceof IntegerType)) error(n.line, n.column, "incompatible types: " + typeToString(indexType) + " cannot be converted to int");
             Type valueType = n.e2.accept(this);
-            if (valueType != null && !(valueType instanceof IntegerType)) error("incompatible types: " + typeToString(valueType) + " cannot be converted to int");
+            if (valueType != null && !(valueType instanceof IntegerType)) error(n.line, n.column, "incompatible types: " + typeToString(valueType) + " cannot be converted to int");
         }
         return null; 
     }
@@ -438,8 +452,8 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.CHECK) {
             Type t1 = n.e1.accept(this);
             Type t2 = n.e2.accept(this);
-            if (t1 != null && !(t1 instanceof BooleanType)) error("bad operand types for binary operator '&&'");
-            if (t2 != null && !(t2 instanceof BooleanType)) error("bad operand types for binary operator '&&'");
+            if (t1 != null && !(t1 instanceof BooleanType)) error(n.line, n.column, "bad operand types for binary operator '&&'");
+            if (t2 != null && !(t2 instanceof BooleanType)) error(n.line, n.column, "bad operand types for binary operator '&&'");
         }
         return new BooleanType(0, 0); 
     }
@@ -447,8 +461,8 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.CHECK) {
             Type t1 = n.e1.accept(this);
             Type t2 = n.e2.accept(this);
-            if (t1 != null && !(t1 instanceof IntegerType)) error("bad operand types for binary operator '<'");
-            if (t2 != null && !(t2 instanceof IntegerType)) error("bad operand types for binary operator '<'");
+            if (t1 != null && !(t1 instanceof IntegerType)) error(n.line, n.column, "bad operand types for binary operator '<'");
+            if (t2 != null && !(t2 instanceof IntegerType)) error(n.line, n.column, "bad operand types for binary operator '<'");
         }
         return new BooleanType(0, 0); 
     }
@@ -456,8 +470,8 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.CHECK) {
             Type t1 = n.e1.accept(this);
             Type t2 = n.e2.accept(this);
-            if (t1 != null && !(t1 instanceof IntegerType)) error("bad operand types for binary operator '+'");
-            if (t2 != null && !(t2 instanceof IntegerType)) error("bad operand types for binary operator '+'");
+            if (t1 != null && !(t1 instanceof IntegerType)) error(n.line, n.column, "bad operand types for binary operator '+'");
+            if (t2 != null && !(t2 instanceof IntegerType)) error(n.line, n.column, "bad operand types for binary operator '+'");
         }
         return new IntegerType(0, 0); 
     }
@@ -465,8 +479,8 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.CHECK) {
             Type t1 = n.e1.accept(this);
             Type t2 = n.e2.accept(this);
-            if (t1 != null && !(t1 instanceof IntegerType)) error("bad operand types for binary operator '-'");
-            if (t2 != null && !(t2 instanceof IntegerType)) error("bad operand types for binary operator '-'");
+            if (t1 != null && !(t1 instanceof IntegerType)) error(n.line, n.column, "bad operand types for binary operator '-'");
+            if (t2 != null && !(t2 instanceof IntegerType)) error(n.line, n.column, "bad operand types for binary operator '-'");
         }
         return new IntegerType(0, 0); 
     }
@@ -474,8 +488,8 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.CHECK) {
             Type t1 = n.e1.accept(this);
             Type t2 = n.e2.accept(this);
-            if (t1 != null && !(t1 instanceof IntegerType)) error("bad operand types for binary operator '*'");
-            if (t2 != null && !(t2 instanceof IntegerType)) error("bad operand types for binary operator '*'");
+            if (t1 != null && !(t1 instanceof IntegerType)) error(n.line, n.column, "bad operand types for binary operator '*'");
+            if (t2 != null && !(t2 instanceof IntegerType)) error(n.line, n.column, "bad operand types for binary operator '*'");
         }
         return new IntegerType(0, 0); 
     }
@@ -483,15 +497,15 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.CHECK) {
             Type t1 = n.e1.accept(this);
             Type t2 = n.e2.accept(this);
-            if (t1 != null && !(t1 instanceof IntArrayType)) error("array required, but non-array found");
-            if (t2 != null && !(t2 instanceof IntegerType)) error("incompatible types: " + typeToString(t2) + " cannot be converted to int");
+            if (t1 != null && !(t1 instanceof IntArrayType)) error(n.line, n.column, "array required, but non-array found");
+            if (t2 != null && !(t2 instanceof IntegerType)) error(n.line, n.column, "incompatible types: " + typeToString(t2) + " cannot be converted to int");
         }
         return new IntegerType(0, 0); 
     }
     public Type visit(ArrayLength n) { 
         if (phase == Phase.CHECK) {
             Type t = n.e.accept(this);
-            if (t != null && !(t instanceof IntArrayType)) error("array required, but non-array found");
+            if (t != null && !(t instanceof IntArrayType)) error(n.line, n.column, "array required, but non-array found");
         }
         return new IntegerType(0, 0); 
     }
@@ -500,25 +514,25 @@ public class TypeCheckVisitor implements TypeVisitor {
             Type objType = n.e.accept(this);
             if (objType == null) return null; 
             if (!(objType instanceof IdentifierType)) {
-                error("cannot be dereferenced");
+                error(n.line, n.column, "cannot be dereferenced");
                 return null;
             }
             String className = ((IdentifierType)objType).s;
             MethodInfo mInfo = getMethod(className, n.i.s);
 
             if (mInfo == null) {
-                error("cannot find symbol: method " + n.i.s);
+                error(n.line, n.column, "cannot find symbol: method " + n.i.s);
                 return null;
             }
 
             if (n.el.size() != mInfo.params.size()) {
-                error("actual and formal argument lists differ in length");
+                error(n.line, n.column, "actual and formal argument lists differ in length");
             } else {
                 int i = 0;
                 for (Type paramType : mInfo.params.values()) {
                     Type argType = n.el.elementAt(i).accept(this);
                     if (argType != null && !isSubtype(argType, paramType)) {
-                        error("incompatible types: " + typeToString(argType) + " cannot be converted to " + typeToString(paramType));
+                        error(n.line, n.column, "incompatible types: " + typeToString(argType) + " cannot be converted to " + typeToString(paramType));
                     }
                     i++;
                 }
@@ -534,7 +548,7 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.CHECK) {
             Type t = getVarType(n.s);
             if (t == null) {
-                error("cannot find symbol: variable " + n.s);
+                error(n.line, n.column, "cannot find symbol: variable " + n.s);
             }
             return t;
         }
@@ -549,14 +563,14 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(NewArray n) { 
         if (phase == Phase.CHECK) {
             Type t = n.e.accept(this);
-            if (t != null && !(t instanceof IntegerType)) error("incompatible types: " + typeToString(t) + " cannot be converted to int");
+            if (t != null && !(t instanceof IntegerType)) error(n.line, n.column, "incompatible types: " + typeToString(t) + " cannot be converted to int");
         }
         return new IntArrayType(0, 0); 
     }
     public Type visit(NewObject n) { 
         if (phase == Phase.CHECK) {
             if (!classes.containsKey(n.i.s)) {
-                error("cannot find symbol: class " + n.i.s);
+                error(n.line, n.column, "cannot find symbol: class " + n.i.s);
                 return null;
             }
             return new IdentifierType(0, 0, n.i.s);
@@ -566,7 +580,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(Not n) { 
         if (phase == Phase.CHECK) {
             Type t = n.e.accept(this);
-            if (t != null && !(t instanceof BooleanType)) error("bad operand type for unary operator '!'");
+            if (t != null && !(t instanceof BooleanType)) error(n.line, n.column, "bad operand type for unary operator '!'");
         }
         return new BooleanType(0, 0); 
     }

@@ -14,6 +14,7 @@ public class Main {
 
 
                 TypeCheckVisitor typeChecker = new TypeCheckVisitor();
+                typeChecker.setFileName(new java.io.File(path).getName());
                 boolean success = typeChecker.check(root);
                 
 
