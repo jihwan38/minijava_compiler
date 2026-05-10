@@ -3,9 +3,12 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class ArrayLength extends Exp {
+  public int line;
+  public int column;
   public Exp e;
   
-  public ArrayLength(Exp ae) {
+  public ArrayLength(int l, int c, Exp ae) {
+    line = l; column = c;
     e=ae; 
   }
 

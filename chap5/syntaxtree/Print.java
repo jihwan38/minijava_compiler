@@ -4,9 +4,12 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class Print extends Statement {
+  public int line;
+  public int column;
   public Exp e;
 
-  public Print(Exp ae) {
+  public Print(int l, int c, Exp ae) {
+    line = l; column = c;
     e = ae;
   }
 

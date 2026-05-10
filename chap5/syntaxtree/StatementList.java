@@ -3,9 +3,12 @@ package syntaxtree;
 import java.util.Vector;
 
 public class StatementList {
+  public int line;
+  public int column;
    private Vector list;
 
    public StatementList() {
+    
       list = new Vector();
    }
 

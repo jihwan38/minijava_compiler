@@ -3,11 +3,14 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class Call extends Exp {
+  public int line;
+  public int column;
   public Exp e;
   public Identifier i;
   public ExpList el;
   
-  public Call(Exp ae, Identifier ai, ExpList ael) {
+  public Call(int l, int c, Exp ae, Identifier ai, ExpList ael) {
+    line = l; column = c;
     e=ae; i=ai; el=ael;
   }
 

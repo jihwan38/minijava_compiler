@@ -3,10 +3,13 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class While extends Statement {
+  public int line;
+  public int column;
   public Exp e;
   public Statement s;
 
-  public While(Exp ae, Statement as) {
+  public While(int l, int c, Exp ae, Statement as) {
+    line = l; column = c;
     e=ae; s=as; 
   }
 

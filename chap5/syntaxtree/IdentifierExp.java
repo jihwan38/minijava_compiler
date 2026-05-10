@@ -3,8 +3,11 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class IdentifierExp extends Exp {
+  public int line;
+  public int column;
   public String s;
-  public IdentifierExp(String as) { 
+  public IdentifierExp(int l, int c, String as) { 
+    line = l; column = c;
     s=as;
   }
 

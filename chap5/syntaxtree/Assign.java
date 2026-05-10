@@ -3,10 +3,13 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class Assign extends Statement {
+  public int line;
+  public int column;
   public Identifier i;
   public Exp e;
 
-  public Assign(Identifier ai, Exp ae) {
+  public Assign(int l, int c, Identifier ai, Exp ae) {
+    line = l; column = c;
     i=ai; e=ae; 
   }
 

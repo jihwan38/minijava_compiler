@@ -3,6 +3,8 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class MethodDecl {
+  public int line;
+  public int column;
   public Type t;
   public Identifier i;
   public FormalList fl;
@@ -10,8 +12,9 @@ public class MethodDecl {
   public StatementList sl;
   public Exp e;
 
-  public MethodDecl(Type at, Identifier ai, FormalList afl, VarDeclList avl, 
+  public MethodDecl(int l, int c, Type at, Identifier ai, FormalList afl, VarDeclList avl, 
                     StatementList asl, Exp ae) {
+    line = l; column = c;
     t=at; i=ai; fl=afl; vl=avl; sl=asl; e=ae;
   }
  

@@ -3,9 +3,12 @@ package syntaxtree;
 import java.util.Vector;
 
 public class VarDeclList {
+  public int line;
+  public int column;
    private Vector list;
 
    public VarDeclList() {
+    
       list = new Vector();
    }
 

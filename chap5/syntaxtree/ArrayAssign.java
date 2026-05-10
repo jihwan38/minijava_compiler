@@ -3,10 +3,13 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class ArrayAssign extends Statement {
+  public int line;
+  public int column;
   public Identifier i;
   public Exp e1,e2;
 
-  public ArrayAssign(Identifier ai, Exp ae1, Exp ae2) {
+  public ArrayAssign(int l, int c, Identifier ai, Exp ae1, Exp ae2) {
+    line = l; column = c;
     i=ai; e1=ae1; e2=ae2;
   }
 

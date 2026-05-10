@@ -3,9 +3,12 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class Block extends Statement {
+  public int line;
+  public int column;
   public StatementList sl;
 
-  public Block(StatementList asl) {
+  public Block(int l, int c, StatementList asl) {
+    line = l; column = c;
     sl=asl;
   }
 

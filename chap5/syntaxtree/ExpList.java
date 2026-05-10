@@ -3,9 +3,12 @@ package syntaxtree;
 import java.util.Vector;
 
 public class ExpList {
+  public int line;
+  public int column;
    private Vector list;
 
    public ExpList() {
+    
       list = new Vector();
    }
 

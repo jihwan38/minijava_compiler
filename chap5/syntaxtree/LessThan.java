@@ -3,9 +3,12 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class LessThan extends Exp {
+  public int line;
+  public int column;
   public Exp e1,e2;
   
-  public LessThan(Exp ae1, Exp ae2) {
+  public LessThan(int l, int c, Exp ae1, Exp ae2) {
+    line = l; column = c;
     e1=ae1; e2=ae2;
   }
 

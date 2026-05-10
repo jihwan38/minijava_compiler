@@ -3,10 +3,13 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class VarDecl {
+  public int line;
+  public int column;
   public Type t;
   public Identifier i;
   
-  public VarDecl(Type at, Identifier ai) {
+  public VarDecl(int l, int c, Type at, Identifier ai) {
+    line = l; column = c;
     t=at; i=ai;
   }
 

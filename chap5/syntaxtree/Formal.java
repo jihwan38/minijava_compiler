@@ -3,10 +3,13 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class Formal {
+  public int line;
+  public int column;
   public Type t;
   public Identifier i;
  
-  public Formal(Type at, Identifier ai) {
+  public Formal(int l, int c, Type at, Identifier ai) {
+    line = l; column = c;
     t=at; i=ai;
   }
 

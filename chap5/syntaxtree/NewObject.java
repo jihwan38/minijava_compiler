@@ -3,9 +3,12 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class NewObject extends Exp {
+  public int line;
+  public int column;
   public Identifier i;
   
-  public NewObject(Identifier ai) {
+  public NewObject(int l, int c, Identifier ai) {
+    line = l; column = c;
     i=ai;
   }
 

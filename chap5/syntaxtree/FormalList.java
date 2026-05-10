@@ -3,9 +3,12 @@ package syntaxtree;
 import java.util.Vector;
 
 public class FormalList {
+  public int line;
+  public int column;
    private Vector list;
 
    public FormalList() {
+    
       list = new Vector();
    }
 

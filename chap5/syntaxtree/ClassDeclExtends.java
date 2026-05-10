@@ -3,13 +3,16 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class ClassDeclExtends extends ClassDecl {
+  public int line;
+  public int column;
   public Identifier i;
   public Identifier j;
   public VarDeclList vl;  
   public MethodDeclList ml;
  
-  public ClassDeclExtends(Identifier ai, Identifier aj, 
+  public ClassDeclExtends(int l, int c, Identifier ai, Identifier aj, 
                   VarDeclList avl, MethodDeclList aml) {
+    line = l; column = c;
     i=ai; j=aj; vl=avl; ml=aml;
   }
 

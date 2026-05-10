@@ -112,7 +112,9 @@ AST 순회 중 기호를 안전하게 테이블에 저장하기 위해, 각 스�
 
 ### 13. Phase 6(추가 기능) 파서 및 AST 확장을 통한 에러 위치(Line/Column) 추적 로직 구현
 현재 컴파일러는 타입 에러를 완벽하게 포착하지만, 실제 자바 컴파일러(`javac`)와 달리 "몇 번째 줄의 몇 번째 칸에서 에러가 발생했는지"를 알려주지 못한다. 이는 파서(Parser)가 AST 노드를 생성할 때 위치 정보를 유실하기 때문이다. 이를 해결하여 현업 수준의 에러 리포팅 시스템을 구축한다.
-1) **AST 노드 구조 확장 (`syntaxtree` 폴더)**: 약 40여 개의 모든 AST 노드 클래스 생성자에 `int line`, `int column` 파라미터를 추가하고 내부 상태로 저장하도록 대규모 리팩토링을 진행한다.
+1) **AST 노드 구조 확장 (`syntaxtree` 폴더) (✅ 완료)**: 
+   - `syntaxtree` 폴더 내의 총 44개 파일 중, 파서에서 직접 생성되지 않는 **추상 클래스 4개**(`Exp`, `Statement`, `Type`, `ClassDecl`)와 단순히 노드를 담는 바구니 역할만 하는 **리스트 클래스 6개**(`ExpList` 등)를 제외한 **총 34개의 실질적인 구문 노드 클래스**를 수정하였다.
+   - 각 클래스에 `public int line; public int column;` 멤버 변수를 추가하고, 모든 생성자의 맨 앞 파라미터로 `(int l, int c, ...)`를 강제로 받도록 수정하여 노드 생성 시 위치 정보를 잃어버리지 않도록 기반 공사를 마쳤다.
 2) **파서 문법 마개조 (`MiniJavaParser.jj`)**: JavaCC의 문법 규칙(Production Rules)을 전면 수정하여, 코드 파싱 중 발생하는 토큰(`Token t`)에서 `t.beginLine`, `t.beginColumn` 정보를 추출하고 이를 AST 노드 생성 시점에 주입하도록 고도화한다.
 3) **방문자 에러 리포팅 수정 (`TypeCheckVisitor.java`)**: 기존의 `error(String msg)` 헬퍼 메서드를 `error(int line, int col, String msg)` 형태로 업그레이드하고, 모든 `visit` 메서드에서 에러 발생 시 노드에 저장된 라인 번호를 꺼내어 `[파일명]:[줄번호]: error: [메시지]` 포맷으로 출력하게끔 수정한다.
 

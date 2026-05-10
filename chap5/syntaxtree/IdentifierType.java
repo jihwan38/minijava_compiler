@@ -3,9 +3,12 @@ import visitor.Visitor;
 import visitor.TypeVisitor;
 
 public class IdentifierType extends Type {
+  public int line;
+  public int column;
   public String s;
 
-  public IdentifierType(String as) {
+  public IdentifierType(int l, int c, String as) {
+    line = l; column = c;
     s=as;
   }
 
