@@ -1,6 +1,6 @@
 class TestOverload {
     public static void main(String[] a){
-        System.out.println(new Child().foo(10));
+        System.out.println(new Child().validOverride(10, true));
     }
 }
 

@@ -116,6 +116,24 @@ public class TypeCheckVisitor implements TypeVisitor {
         return false;
     }
 
+    private boolean isSubtype(Type child, Type parent) {
+        if (child == null || parent == null) return false;
+        if (child instanceof IntegerType && parent instanceof IntegerType) return true;
+        if (child instanceof BooleanType && parent instanceof BooleanType) return true;
+        if (child instanceof IntArrayType && parent instanceof IntArrayType) return true;
+        if (child instanceof IdentifierType && parent instanceof IdentifierType) {
+            String cName = ((IdentifierType)child).s;
+            String pName = ((IdentifierType)parent).s;
+            while (cName != null) {
+                if (cName.equals(pName)) return true;
+                ClassInfo cInfo = classes.get(cName);
+                if (cInfo == null) break;
+                cName = cInfo.parent;
+            }
+        }
+        return false;
+    }
+
     private void checkOverloading(ClassInfo c, MethodInfo m) {
         if (c.parent == null) return;
         
@@ -183,6 +201,16 @@ public class TypeCheckVisitor implements TypeVisitor {
             } else {
                 c = null;
             }
+        }
+        return null;
+    }
+
+    private MethodInfo getMethod(String className, String methodName) {
+        ClassInfo curr = classes.get(className);
+        while (curr != null) {
+            if (curr.methods.containsKey(methodName)) return curr.methods.get(methodName);
+            if (curr.parent != null) curr = classes.get(curr.parent);
+            else curr = null;
         }
         return null;
     }
@@ -284,16 +312,16 @@ public class TypeCheckVisitor implements TypeVisitor {
             MethodInfo m = new MethodInfo(n.i.s, n.t);
             if (!currentClass.addMethod(n.i.s, m)) {
                 error("method " + n.i.s + " is already defined in class " + currentClass.name);
-            } else {
-                currentMethod = m;
-                for (int i = 0; i < n.fl.size(); i++) {
-                    n.fl.elementAt(i).accept(this);
-                }
-                for (int i = 0; i < n.vl.size(); i++) {
-                    n.vl.elementAt(i).accept(this);
-                }
-                currentMethod = null;
             }
+            currentMethod = m;
+            n.t.accept(this);
+            for (int i = 0; i < n.fl.size(); i++) {
+                n.fl.elementAt(i).accept(this);
+            }
+            for (int i = 0; i < n.vl.size(); i++) {
+                n.vl.elementAt(i).accept(this);
+            }
+            currentMethod = null;
         } else {
             currentMethod = currentClass.methods.get(n.i.s);
             checkOverloading(currentClass, currentMethod);
@@ -307,7 +335,10 @@ public class TypeCheckVisitor implements TypeVisitor {
             for (int i = 0; i < n.sl.size(); i++) {
                 n.sl.elementAt(i).accept(this);
             }
-            n.e.accept(this);
+            Type retType = n.e.accept(this);
+            if (retType != null && !isSubtype(retType, n.t)) {
+                error("return type mismatch in method " + n.i.s);
+            }
             currentMethod = null;
         }
         return null; 
@@ -344,7 +375,8 @@ public class TypeCheckVisitor implements TypeVisitor {
     }
     public Type visit(If n) { 
         if (phase == Phase.CHECK) {
-            n.e.accept(this);
+            Type cond = n.e.accept(this);
+            if (cond != null && !(cond instanceof BooleanType)) error("if condition must be boolean");
             n.s1.accept(this);
             n.s2.accept(this);
         }
@@ -352,124 +384,182 @@ public class TypeCheckVisitor implements TypeVisitor {
     }
     public Type visit(While n) { 
         if (phase == Phase.CHECK) {
-            n.e.accept(this);
+            Type cond = n.e.accept(this);
+            if (cond != null && !(cond instanceof BooleanType)) error("while condition must be boolean");
             n.s.accept(this);
         }
         return null; 
     }
     public Type visit(Print n) { 
         if (phase == Phase.CHECK) {
-            n.e.accept(this);
+            Type t = n.e.accept(this);
+            if (t != null && !(t instanceof IntegerType)) error("print statement argument must be int");
         }
         return null; 
     }
     public Type visit(Assign n) { 
         if (phase == Phase.CHECK) {
-            if (getVarType(n.i.s) == null) {
+            Type varType = getVarType(n.i.s);
+            if (varType == null) {
                 error("cannot find symbol: variable " + n.i.s);
             }
-            n.e.accept(this);
+            Type expType = n.e.accept(this);
+            if (varType != null && expType != null && !isSubtype(expType, varType)) {
+                error("incompatible types in assignment to " + n.i.s);
+            }
         }
         return null; 
     }
     public Type visit(ArrayAssign n) { 
         if (phase == Phase.CHECK) {
-            if (getVarType(n.i.s) == null) {
+            Type varType = getVarType(n.i.s);
+            if (varType == null) {
                 error("cannot find symbol: variable " + n.i.s);
+            } else if (!(varType instanceof IntArrayType)) {
+                error("array assignment to non-array variable " + n.i.s);
             }
-            n.e1.accept(this);
-            n.e2.accept(this);
+            Type indexType = n.e1.accept(this);
+            if (indexType != null && !(indexType instanceof IntegerType)) error("array index must be int");
+            Type valueType = n.e2.accept(this);
+            if (valueType != null && !(valueType instanceof IntegerType)) error("array element assignment must be int");
         }
         return null; 
     }
     public Type visit(And n) { 
         if (phase == Phase.CHECK) {
-            n.e1.accept(this);
-            n.e2.accept(this);
+            Type t1 = n.e1.accept(this);
+            Type t2 = n.e2.accept(this);
+            if (t1 != null && !(t1 instanceof BooleanType)) error("left operand of && must be boolean");
+            if (t2 != null && !(t2 instanceof BooleanType)) error("right operand of && must be boolean");
         }
-        return null; 
+        return new BooleanType(); 
     }
     public Type visit(LessThan n) { 
         if (phase == Phase.CHECK) {
-            n.e1.accept(this);
-            n.e2.accept(this);
+            Type t1 = n.e1.accept(this);
+            Type t2 = n.e2.accept(this);
+            if (t1 != null && !(t1 instanceof IntegerType)) error("left operand of < must be int");
+            if (t2 != null && !(t2 instanceof IntegerType)) error("right operand of < must be int");
         }
-        return null; 
+        return new BooleanType(); 
     }
     public Type visit(Plus n) { 
         if (phase == Phase.CHECK) {
-            n.e1.accept(this);
-            n.e2.accept(this);
+            Type t1 = n.e1.accept(this);
+            Type t2 = n.e2.accept(this);
+            if (t1 != null && !(t1 instanceof IntegerType)) error("left operand of + must be int");
+            if (t2 != null && !(t2 instanceof IntegerType)) error("right operand of + must be int");
         }
-        return null; 
+        return new IntegerType(); 
     }
     public Type visit(Minus n) { 
         if (phase == Phase.CHECK) {
-            n.e1.accept(this);
-            n.e2.accept(this);
+            Type t1 = n.e1.accept(this);
+            Type t2 = n.e2.accept(this);
+            if (t1 != null && !(t1 instanceof IntegerType)) error("left operand of - must be int");
+            if (t2 != null && !(t2 instanceof IntegerType)) error("right operand of - must be int");
         }
-        return null; 
+        return new IntegerType(); 
     }
     public Type visit(Times n) { 
         if (phase == Phase.CHECK) {
-            n.e1.accept(this);
-            n.e2.accept(this);
+            Type t1 = n.e1.accept(this);
+            Type t2 = n.e2.accept(this);
+            if (t1 != null && !(t1 instanceof IntegerType)) error("left operand of * must be int");
+            if (t2 != null && !(t2 instanceof IntegerType)) error("right operand of * must be int");
         }
-        return null; 
+        return new IntegerType(); 
     }
     public Type visit(ArrayLookup n) { 
         if (phase == Phase.CHECK) {
-            n.e1.accept(this);
-            n.e2.accept(this);
+            Type t1 = n.e1.accept(this);
+            Type t2 = n.e2.accept(this);
+            if (t1 != null && !(t1 instanceof IntArrayType)) error("array lookup on non-array");
+            if (t2 != null && !(t2 instanceof IntegerType)) error("array index must be int");
         }
-        return null; 
+        return new IntegerType(); 
     }
     public Type visit(ArrayLength n) { 
         if (phase == Phase.CHECK) {
-            n.e.accept(this);
+            Type t = n.e.accept(this);
+            if (t != null && !(t instanceof IntArrayType)) error("length applied to non-array");
         }
-        return null; 
+        return new IntegerType(); 
     }
     public Type visit(Call n) { 
         if (phase == Phase.CHECK) {
-            n.e.accept(this);
-            for (int i = 0; i < n.el.size(); i++) {
-                n.el.elementAt(i).accept(this);
+            Type objType = n.e.accept(this);
+            if (objType == null) return null; 
+            if (!(objType instanceof IdentifierType)) {
+                error("method call on non-class type");
+                return null;
             }
+            String className = ((IdentifierType)objType).s;
+            MethodInfo mInfo = getMethod(className, n.i.s);
+
+            if (mInfo == null) {
+                error("cannot find symbol: method " + n.i.s);
+                return null;
+            }
+
+            if (n.el.size() != mInfo.params.size()) {
+                error("method " + n.i.s + " requires " + mInfo.params.size() + " arguments, but " + n.el.size() + " found");
+            } else {
+                int i = 0;
+                for (Type paramType : mInfo.params.values()) {
+                    Type argType = n.el.elementAt(i).accept(this);
+                    if (argType != null && !isSubtype(argType, paramType)) {
+                        error("incompatible types in argument " + (i+1) + " of method " + n.i.s);
+                    }
+                    i++;
+                }
+            }
+            return mInfo.returnType;
         }
         return null; 
     }
-    public Type visit(IntegerLiteral n) { return null; }
-    public Type visit(True n) { return null; }
-    public Type visit(False n) { return null; }
+    public Type visit(IntegerLiteral n) { return new IntegerType(); }
+    public Type visit(True n) { return new BooleanType(); }
+    public Type visit(False n) { return new BooleanType(); }
     public Type visit(IdentifierExp n) { 
         if (phase == Phase.CHECK) {
-            if (getVarType(n.s) == null) {
+            Type t = getVarType(n.s);
+            if (t == null) {
                 error("cannot find symbol: variable " + n.s);
             }
+            return t;
         }
         return null; 
     }
-    public Type visit(This n) { return null; }
-    public Type visit(NewArray n) { 
+    public Type visit(This n) { 
         if (phase == Phase.CHECK) {
-            n.e.accept(this);
+            if (currentClass != null) return new IdentifierType(currentClass.name);
         }
         return null; 
+    }
+    public Type visit(NewArray n) { 
+        if (phase == Phase.CHECK) {
+            Type t = n.e.accept(this);
+            if (t != null && !(t instanceof IntegerType)) error("array size must be int");
+        }
+        return new IntArrayType(); 
     }
     public Type visit(NewObject n) { 
         if (phase == Phase.CHECK) {
             if (!classes.containsKey(n.i.s)) {
                 error("cannot find symbol: class " + n.i.s);
+                return null;
             }
+            return new IdentifierType(n.i.s);
         }
         return null; 
     }
     public Type visit(Not n) { 
         if (phase == Phase.CHECK) {
-            n.e.accept(this);
+            Type t = n.e.accept(this);
+            if (t != null && !(t instanceof BooleanType)) error("operand of ! must be boolean");
         }
-        return null; 
+        return new BooleanType(); 
     }
     public Type visit(Identifier n) { return null; }
 }

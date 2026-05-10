@@ -51,6 +51,20 @@ public class Main {
                     } else {
                         System.err.println("TEST FAIL: TestAcyclic.java generated " + errorCount + " errors (expected 6).");
                     }
+                } else if (path.endsWith("TestExprMismatch.java")) {
+                    int errorCount = typeChecker.getErrors().size();
+                    if (errorCount == 14) {
+                        System.out.println("TEST PASS: TestExprMismatch.java successfully generated exactly 14 errors.");
+                    } else {
+                        System.err.println("TEST FAIL: TestExprMismatch.java generated " + errorCount + " errors (expected 14).");
+                    }
+                } else if (path.endsWith("TestStmtMismatch.java")) {
+                    int errorCount = typeChecker.getErrors().size();
+                    if (errorCount == 7) {
+                        System.out.println("TEST PASS: TestStmtMismatch.java successfully generated exactly 7 errors.");
+                    } else {
+                        System.err.println("TEST FAIL: TestStmtMismatch.java generated " + errorCount + " errors (expected 7).");
+                    }
                 }
             } catch (ParseException e) {
                 System.err.println("Parse error in " + path + ":\n" + e.toString());
