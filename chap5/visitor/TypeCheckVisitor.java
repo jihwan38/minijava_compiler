@@ -337,7 +337,7 @@ public class TypeCheckVisitor implements TypeVisitor {
             }
             Type retType = n.e.accept(this);
             if (retType != null && !isSubtype(retType, n.t)) {
-                error("return type mismatch in method " + n.i.s);
+                error("incompatible types");
             }
             currentMethod = null;
         }
@@ -376,7 +376,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(If n) { 
         if (phase == Phase.CHECK) {
             Type cond = n.e.accept(this);
-            if (cond != null && !(cond instanceof BooleanType)) error("if condition must be boolean");
+            if (cond != null && !(cond instanceof BooleanType)) error("incompatible types");
             n.s1.accept(this);
             n.s2.accept(this);
         }
@@ -385,7 +385,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(While n) { 
         if (phase == Phase.CHECK) {
             Type cond = n.e.accept(this);
-            if (cond != null && !(cond instanceof BooleanType)) error("while condition must be boolean");
+            if (cond != null && !(cond instanceof BooleanType)) error("incompatible types");
             n.s.accept(this);
         }
         return null; 
@@ -393,7 +393,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(Print n) { 
         if (phase == Phase.CHECK) {
             Type t = n.e.accept(this);
-            if (t != null && !(t instanceof IntegerType)) error("print statement argument must be int");
+            if (t != null && !(t instanceof IntegerType)) error("incompatible types");
         }
         return null; 
     }
@@ -405,7 +405,7 @@ public class TypeCheckVisitor implements TypeVisitor {
             }
             Type expType = n.e.accept(this);
             if (varType != null && expType != null && !isSubtype(expType, varType)) {
-                error("incompatible types in assignment to " + n.i.s);
+                error("incompatible types");
             }
         }
         return null; 
@@ -416,12 +416,12 @@ public class TypeCheckVisitor implements TypeVisitor {
             if (varType == null) {
                 error("cannot find symbol: variable " + n.i.s);
             } else if (!(varType instanceof IntArrayType)) {
-                error("array assignment to non-array variable " + n.i.s);
+                error("array required, but non-array found");
             }
             Type indexType = n.e1.accept(this);
-            if (indexType != null && !(indexType instanceof IntegerType)) error("array index must be int");
+            if (indexType != null && !(indexType instanceof IntegerType)) error("incompatible types");
             Type valueType = n.e2.accept(this);
-            if (valueType != null && !(valueType instanceof IntegerType)) error("array element assignment must be int");
+            if (valueType != null && !(valueType instanceof IntegerType)) error("incompatible types");
         }
         return null; 
     }
@@ -429,8 +429,8 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.CHECK) {
             Type t1 = n.e1.accept(this);
             Type t2 = n.e2.accept(this);
-            if (t1 != null && !(t1 instanceof BooleanType)) error("left operand of && must be boolean");
-            if (t2 != null && !(t2 instanceof BooleanType)) error("right operand of && must be boolean");
+            if (t1 != null && !(t1 instanceof BooleanType)) error("bad operand types for binary operator '&&'");
+            if (t2 != null && !(t2 instanceof BooleanType)) error("bad operand types for binary operator '&&'");
         }
         return new BooleanType(); 
     }
@@ -438,8 +438,8 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.CHECK) {
             Type t1 = n.e1.accept(this);
             Type t2 = n.e2.accept(this);
-            if (t1 != null && !(t1 instanceof IntegerType)) error("left operand of < must be int");
-            if (t2 != null && !(t2 instanceof IntegerType)) error("right operand of < must be int");
+            if (t1 != null && !(t1 instanceof IntegerType)) error("bad operand types for binary operator '<'");
+            if (t2 != null && !(t2 instanceof IntegerType)) error("bad operand types for binary operator '<'");
         }
         return new BooleanType(); 
     }
@@ -447,8 +447,8 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.CHECK) {
             Type t1 = n.e1.accept(this);
             Type t2 = n.e2.accept(this);
-            if (t1 != null && !(t1 instanceof IntegerType)) error("left operand of + must be int");
-            if (t2 != null && !(t2 instanceof IntegerType)) error("right operand of + must be int");
+            if (t1 != null && !(t1 instanceof IntegerType)) error("bad operand types for binary operator '+'");
+            if (t2 != null && !(t2 instanceof IntegerType)) error("bad operand types for binary operator '+'");
         }
         return new IntegerType(); 
     }
@@ -456,8 +456,8 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.CHECK) {
             Type t1 = n.e1.accept(this);
             Type t2 = n.e2.accept(this);
-            if (t1 != null && !(t1 instanceof IntegerType)) error("left operand of - must be int");
-            if (t2 != null && !(t2 instanceof IntegerType)) error("right operand of - must be int");
+            if (t1 != null && !(t1 instanceof IntegerType)) error("bad operand types for binary operator '-'");
+            if (t2 != null && !(t2 instanceof IntegerType)) error("bad operand types for binary operator '-'");
         }
         return new IntegerType(); 
     }
@@ -465,8 +465,8 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.CHECK) {
             Type t1 = n.e1.accept(this);
             Type t2 = n.e2.accept(this);
-            if (t1 != null && !(t1 instanceof IntegerType)) error("left operand of * must be int");
-            if (t2 != null && !(t2 instanceof IntegerType)) error("right operand of * must be int");
+            if (t1 != null && !(t1 instanceof IntegerType)) error("bad operand types for binary operator '*'");
+            if (t2 != null && !(t2 instanceof IntegerType)) error("bad operand types for binary operator '*'");
         }
         return new IntegerType(); 
     }
@@ -474,15 +474,15 @@ public class TypeCheckVisitor implements TypeVisitor {
         if (phase == Phase.CHECK) {
             Type t1 = n.e1.accept(this);
             Type t2 = n.e2.accept(this);
-            if (t1 != null && !(t1 instanceof IntArrayType)) error("array lookup on non-array");
-            if (t2 != null && !(t2 instanceof IntegerType)) error("array index must be int");
+            if (t1 != null && !(t1 instanceof IntArrayType)) error("array required, but non-array found");
+            if (t2 != null && !(t2 instanceof IntegerType)) error("incompatible types");
         }
         return new IntegerType(); 
     }
     public Type visit(ArrayLength n) { 
         if (phase == Phase.CHECK) {
             Type t = n.e.accept(this);
-            if (t != null && !(t instanceof IntArrayType)) error("length applied to non-array");
+            if (t != null && !(t instanceof IntArrayType)) error("array required, but non-array found");
         }
         return new IntegerType(); 
     }
@@ -491,7 +491,7 @@ public class TypeCheckVisitor implements TypeVisitor {
             Type objType = n.e.accept(this);
             if (objType == null) return null; 
             if (!(objType instanceof IdentifierType)) {
-                error("method call on non-class type");
+                error("cannot be dereferenced");
                 return null;
             }
             String className = ((IdentifierType)objType).s;
@@ -503,13 +503,13 @@ public class TypeCheckVisitor implements TypeVisitor {
             }
 
             if (n.el.size() != mInfo.params.size()) {
-                error("method " + n.i.s + " requires " + mInfo.params.size() + " arguments, but " + n.el.size() + " found");
+                error("actual and formal argument lists differ in length");
             } else {
                 int i = 0;
                 for (Type paramType : mInfo.params.values()) {
                     Type argType = n.el.elementAt(i).accept(this);
                     if (argType != null && !isSubtype(argType, paramType)) {
-                        error("incompatible types in argument " + (i+1) + " of method " + n.i.s);
+                        error("incompatible types");
                     }
                     i++;
                 }
@@ -540,7 +540,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(NewArray n) { 
         if (phase == Phase.CHECK) {
             Type t = n.e.accept(this);
-            if (t != null && !(t instanceof IntegerType)) error("array size must be int");
+            if (t != null && !(t instanceof IntegerType)) error("incompatible types");
         }
         return new IntArrayType(); 
     }
@@ -557,7 +557,7 @@ public class TypeCheckVisitor implements TypeVisitor {
     public Type visit(Not n) { 
         if (phase == Phase.CHECK) {
             Type t = n.e.accept(this);
-            if (t != null && !(t instanceof BooleanType)) error("operand of ! must be boolean");
+            if (t != null && !(t instanceof BooleanType)) error("bad operand type for unary operator '!'");
         }
         return new BooleanType(); 
     }
