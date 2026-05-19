@@ -1,0 +1,64 @@
+[프로젝트 1] MiniJava 파서, AST 빌드, PrettyPrint
+								학과: 소프트웨어공학과
+					        		학번: 213652
+                                                                이름: 김지환
+목차
+0.	파일 옮기기
+1.	초기 빌드 테스트
+2.	MiniJavaParser.jj에 Semantic Actions 추가
+
+
+0. 파일 및 폴더 복사
+ch4 폴더를 생성한 AndrewAppel/chap4/handcrafted 폴더에 있는 syntax tree 폴더, visitor 폴더, Main.java를 옮겼다.
+이후 ch3에서 파싱만을 위해 만들어 두었던 MiniJavaParser.jj를 옮겼다.
+JavaCC 환경 같은 경우 시스템 전역 환경 변수를 설정하는 방식 대신 프로젝트 디렉토리 내에 직접 javacc.jar를 포함시키는 방식을 채택하였다. 
+ 
+1. 초기 빌드 테스트
+AST 변환 작업 전, java -cp javacc.jar javacc MiniJavaParser.jj 명령어를 통해 제대로 파서가 생성되는지 확인하였다. 
+ 
+이후 javac *.java 명령어를 통해 전체 클래스 파일 컴파일을 시도하였지만 다음과 같이 에러가 발생하였다.
+ 
+이는 새롭게 적용된 Main.java의 드라이버 코드가 Goal() 함수의 파싱 결과물로 AST의 루트인 Program 객체를 반환할 것으로 기대하고 있지만, 3장에서 작성한 기존 Goal() 함수는 단순히 문법 검사만 수행하고 반환형을 가지지 않는 void 상태이기 때문에 발생한 에러이다.
+2. MiniJavaParser.jj에 Semantic Actions 추가
+1단계에서 확인된 컴파일러 타입 불일치 문제를 해결하기 위해, MiniJavaParser.jj 파일 전체를 AST 노드를 반환하는 구조로 재작성하였다.
+2.1 패키지 연동
+AST 구조 클래스들을 미리 모아둔 syntaxtree 패키지를 사용하기 위해 PARSER_BEGIN 구역에 import문을 통해 패키지 연동을 하였다. 
+ 
+2.2 Identifier, Literal 
+가장 먼저 하위에 위치하는 리프 노드(식별자, IntegerLiteral 등)부터 AST 객체로 추출하는 리팩토링을 진행하였다. 어휘 분석기에서 얻은 Token t 에서 실제 값만을 추출한 뒤, syntaxtree 패키지에 정의된 Identifier, IntegerLiteral 등의 AST 노드로 변환하여 반환하도록 수정하였다. 단, IntegerLiteral 생성자 호출 인자 타입은 String이 아닌 Integer이기 때문에 Integer.parseInt 를 통해서 전달했다.
+ 
+2.3 Type
+변수 선언 등에 사용되는 자료형 또한 AST 상에서 개별적인 노드로 취급하고 있기 때문에 반환형을 수정하였다. 
+int 나 boolean 같은 기본 자료형들은 각각 매칭되는 순수 객체를 바로 반환하도록 수정하였고, IdentifierType의 경우에는 Identifier 객체의 실제 이름 값을 통해 타입 객체로 만들어 반환하도록 하였다.
+ 
+2.4 PrimaryExpression
+괄호 표기식, this 지시자, 배열 및 객체 할당 구문이 포함된 PrimaryExpression 규칙의 반환형을 Exp로 수정하였다. 각 구문이 파싱될 때 This, NewArray, NewObject 등의 개별적인 AST 노드 객체를 생성하여 반환하도록 모두 수정해주었다.
+ 
+2.5 PostfixExpression
+메서드 호출, 배열 인덱스, 배열 길이 접근을 담당하는 PostfixExpression 규칙의 반환형을 Exp로 수정하였다. 파싱 시 대괄호([]), 소괄호(()) 기호는 제외하고, 내부의 ExpList나 배열 인덱스 등 의미 있는 부분만 활용하여 각 AST 노드의 생성자 인자로 전달하여 반환하도록 구현하였다.
+메서드 호출 구문의 인자 리스트 처리 시엔 매개변수가 없는 경우의 Null 에러를 방지하기 위해 ExpList 객체를 기본값으로 먼저 할당해 두었다. 이후 EBNF 대괄호 [] 구문을 이용하여, 실제 내부 표현식 인자가 존재해 파싱될 때에만 해당 결과 객체로 덮어씌워 전달되도록 구현하였다.
+ 
+2.6 UnaryExpression
+부정 연산을 지정하는 UnaryExpression 구문 규칙의 반환형을 Exp로 수정하였다. 파싱 과정에서 ! 기호를 읽었을 경우, 우측에 뒤따르는 e를 재귀적으로 파싱한 뒤 이를 Not AST 노드의 생성자 인자로 전달해 객체를 반환하도록 구현하였다.
+ 
+2.7 Binary Expression
+사칙연산 및 논리 연산은 ()* 반복문으로 구현되어 있다. 연산자 우선순위와 좌결합 원칙이 반영되도록 구현하기 위해 반복문 내에서 연산자가 인식될 때마다 기존의 좌측 자식 노드(e1)를 상위 연산 노드로 갱신하도록 하였다. 반복이 다 끝나게 되면 각 연산에 해당하는 객체를 반환하게 된다.
+ 
+2.8 Statement 
+출력문(PrintStatement)과 대입 구문(AssignmentStatement 등)을 모두 Statement 반환형으로 수정하였다. 출력문은 내부 표현식을 Print 노드로 감싸 객체를 반환하도록 하였으며, 대입 구문은 연산자(=) 좌측의 식별자와 우측의 계산식이 파싱된 결과 객체를 각각 변수(i, e)로 받은 뒤, 이를 Assign 계열 노드의 생성자 인자로 전달해 반환하도록 구현하였다. 제어 명령문인 While, If의 경우 괄호 안의 조건식(Exp)과 실행 문장(Statement)의 파싱 결과 객체를 얻어낸 뒤 이를 곧바로 해당 AST 노드의 인자로 넘겨주도록 구현하였다. 또한, 다중 블록 구문(Block)은 중괄호 {} 내부에서 문장이 반복 파싱될 때마다 StatementList에 지속적으로 요소를 추가하고, 최종적으로 이 리스트 객체를 Block 노드로 넘겨주도록 수정하였다.
+
+2.9 Declaration
+ClassDeclaration, MethodDeclaration, VarDeclaration 및 매개변수 구문들의 반환형을 각각의 특화된 AST 노드 객체로 수정하였다. 파싱 과정 중 클래스명, 상속 관계, 변수 리스트와 메서드 리스트 등을 각각 파싱 및 변수에 저장하여 취합한 뒤, 이를 각 노드의 생성자 인자로 전달해 객체를 반환하도록 구현하였다.
+
+2.10 Goal, Program
+MainClass와 Goal 규칙이 각각 MainClass 및 Program AST 노드를 반환하도록 수정하였다. MainClass 구문에서는 파싱을 통해 두 개의 식별자(클래스명, 메인 메서드 매개변수명)와 내부 실행 문장(Statement)을 변수로 받아 MainClass 노드의 생성자 인자로 넘겨주었다. 최종적으로 Goal은 하위에서 반환된 MainClass와 모든 Declaration 노드들을 인자로 넘겨받아 단 하나의 Program 루트 노드로 묶어 반환한다. 
+이를 통해 실제 드라이버 코드인 Main.java 가 파서의 Goal() 메서드를 호출하여 전체 구조가 담긴 Program 객체를 안전하게 조달받을 수 있게 되며, 이후 해당 객체를 통해 PrettyPrintVisitor 등 다양한 방문자(Visitor) 알고리즘을 정상적으로 수행할 수 있게 된다.
+
+3. 최종 빌드 및 테스트
+모든 파서의 AST 변환 작업이 끝난 후 다시 javac *.java 명령어를 통해 컴파일을 수행하였으며, 1장에서 발생했던 반환형 불일치(void cannot be converted to Program) 에러가 해결되었음을 확인하였다.
+이후 programs/ 폴더에 존재하는 8개의 미니자바 테스트 코드(Factorial.java, BinarySearch.java 등)를 파서에 입력하여 파싱 및 AST 빌드를 진행하였다.
+
+> cat ../programs/Factorial.java | java Main
+(스크린샷 첨부 예정)
+
+테스트 결과, 8종류의 소스코드 모두 파싱 에러 없이 AST 트리 구조로 빌드되었으며, PrettyPrintVisitor 객체가 트리를 순회하며 들여쓰기가 교정된 정상적인 자바 소스 코드를 다시 화면에 성공적으로 출력하는 것을 확인하였다.

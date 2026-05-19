@@ -1,0 +1,336 @@
+5장 의미 분석
+(타입 검사)
+최광훈
+전남대학교
+Andrew Appel, Modern Compiler Implementation in Java (2nd. Ed.)
+- Jens Palsberg 교수의 컴파일러 강의 자료 참고
+목차
+의미 분석(Semantic analysis)
+[실습] MiniJava 타입 검사
+2
+의미 분석(타입 검사)
+컴파일 과정은 파서가 발견한 프로그램의 구문 구조에 의해 주도됨
+의미 루틴은
+ - 구문 구조에 따라 프로그램의 의미를 해석
+ - 두 가지 목적
+   1) 문맥에 의존하는 정보를 도출하여 분석을 마무리하고,
+   2) IR 또는 목적 코드 생성을 시작하는 것
+ - 문맥 자유 문법의 각 생성 규칙 또는 구문 트리의 하위 트리 단위로 진행
+3
+문맥 의존 분석
+문맥 자유 문법만으로는 답할 수 없는 질문들
+- x는 스칼라인가, 배열인가, 아니면 함수인가?
+- x는 사용되기 전에 선언되었는가?
+- 선언되었지만 사용되지 않은 이름이 있는가?
+- 이 참조가 가리키는 것은 어느 선언인가?
+- 이 식은 타입에서 일관적으로 구성되어 있는가?
+- 참조의 차원이 선언과 일치하는가?
+- x는 어디에 저장될 수 있는가? (예: 힙, 스택, …)
+4
+문맥 의존 분석
+문맥 자유 문법만으로는 답할 수 없는 질문들
+  …
+- p는 malloc()의 결과를 참조하는가?
+- x는 사용되기 전에 정의되었는가?
+- 배열 참조가 범위 내에 있는가?
+- 함수 f는 상수 값을 생성하는가?
+- f는 메모 함수로 구현될 수 있는가?
+5
+문맥 의존 분석
+문맥에 의존하는 분석은 왜 어려운가?
+ - 답하기 위해서 구문이 아니라 값이 필요하기 때문
+ - 질문과 답이 지역에 있지 않은 정보(non-local info.)가 필요하기 때문
+ - 답을 구하기 위해 계산이 필요하기 때문 
+6
+문맥 의존 분석
+여러가지 대안
+ - AST 속성 문법 (attribute grammars): 비지역적 계산을 기술하고 자동 계산
+ - 심볼 테이블(symbol table): 컴파일러가 분석한 사실들을 저장하는 자료 구조
+    : 변수 이름, 타입, 이름의 범위(scope), 메모리 위치(힙, 스택), 선언된 함수 타입
+ - 언어 설계: 애초에 언어를 단순하게 설계해서 문맥 의존하는 문제를 줄이거나 
+피하기
+=> 심볼 테이블
+7
+심볼 테이블
+심볼 테이블
+ - 어휘 이름(심볼)을 그에 대응하는 속성(타입, 내부 레이아웃, …)과 연결
+어떤 항목(심볼)을 넣어야 하는가?
+ - 변수 이름, 정의된 상수, 프로시저와 함수 이름, 리터럴(literal) 상수와 문자열
+ - 소스 코드의 라벨, 컴파일러가 생성하는 임시 변수 
+   (a + b * c)  =>  (t1 = b * c; t2 = a + t1)
+8
+심볼 테이블
+구조체, 레코드, 클래스 같은 복합 타입의 내부 레이아웃 정보 관리
+ - 필드 이름과 타입, 필드의 오프셋(offset), 전체 크기(length/size)
+ - struct Point { int x; int y; }
+      x의 위치, y의 위치, 전체 크기
+9
+심볼 테이블 정보
+- 이름, 타입, 차원 정보
+- 프로시저 선언, 선언의 어휘 단계(lexical level)
+- 저장 클래스
+- 저장 위치에서의 오프셋
+- 레코드라면, 구조 테이블에 대한 포인터
+- 매개변수라면, 참조 전달(by-reference)인지 값 전달(by-value)인지
+- 별칭(alias)이 가능한지? 가능하다면 어떤 다른 이름과?
+- 함수 인자 개수와 각 인자의 타입
+10
+중첩 스코프를 위한 블록 구조 심볼 테이블
+어떤 이름을 찾을 때, 그 이름의 가장 최근 선언을 찾아야 함
+ - 그 선언은 현재 스코프에 있을 수도 있고, 이를 감싸는 바깥 스코프에 있을 수도 
+있음
+ - 가장 안쪽 스코프(innermost scope)의 선언이 바깥 스코프의 선언보다 우선함
+Key: 새로운 이름 선언은 대개 현재 스코프에만 추가됨
+11
+중첩 스코프를 위한 블록 구조 심볼 테이블
+필요한 연산
+ - void put(Symbol key, Object value) : 이름을 해당 정보에 연결(binding)
+ - Object get(Symbol key) : 이름에 바인딩된 정보를 조회
+ - void beginScope() : 현재 심볼 테이블 상태를 따로 보관
+ - void endScope() : 가장 최근에 따로 보관한 심볼 테이블 상태를 복원
+(디버깅 목적으로 지역 변수 목록을 유지하여, 현재 스코프의 변수들을 보여줄 수 
+있음)
+12
+속성 정보
+속성(attributes)은 상수/변수/함수/클래스/… 선언의 내부 표현
+심볼 테이블은 이름을 그에 대응하는 속성과 연결
+이름은 그 의미에 따라 서로 다른 속성을 가질 수 있음
+ - 변수: 타입, 선언 수준, 프레임 내 위치(오프셋)
+ - 타입: 타입 정보, 크기, 정렬 단위
+ - 상수: 타입, 값
+ - 함수: 형식 매개변수(이름/타입), 반환 타입, 지역 선언 정보, 프레임 크기 
+13
+심볼 테이블 구현
+- 
+14
+put 함수는 기존 테이블을 수정하지 않고 
+새로운 테이블을 반환한다면,
+새로운 버전의 테이블을 사용하는 
+동안에도 이전 버전의 테이블을 그대로 
+보관할 수 있으므로, beginScope와 
+endScope는 필요하지 않음.
+심볼 테이블 구현
+- 예) int x = 1;
+      {
+        int y = 2;
+        int x = 3;
+      } 
+15
+x_sym |-> 1
+y_sym |-> 2
+x_sym |-> 3
+x_sym |-> 1
+push
+by beginScope()
+pop
+by endScope()
+심볼 구현
+- 
+16
+intern()은 같은 문자 시퀀스를 갖는 
+문자열에 대해 동일한 String 객체를 
+돌려주는 기능
+String a = new String("abc").intern();
+String b = new String("abc").intern(); 
+a와 b는 같은 문자열 객체를 가리킴
+심볼 구현
+문자열(string)을 그대로 이름으로 쓰면 비효율적, 문자열을 심볼로 변환해서 사용
+ - 예) abc := 10
+         abc + 1 
+ - 입력 프로그램 안에서는 문자열 "abc"가 여러 번 나타남. 이때 매번 문자열 "abc"
+를 직접 비교하면 비용이 큼
+소스 코드 안의 문자열 이름 -> Symbol 모듈 -> 고유한 symbol 객체 -> 
+environment, hash table, tree 등의 key로 사용 
+17
+목차
+의미 분석(Semantic analysis)
+[실습] MiniJava 타입 검사
+18
+MiniJava 타입 검사
+In chap5/handcrafted/Main.java
+19
+
+MiniJava 타입 검사: 성공
+In chap5/handcrafted/Main.java
+ - $ java Main ../../programs/Factorial.java
+   Successfully type checked for ../../programs/Factorial.java
+ - 나머지 programs 예제들도 타입 검사 성공
+   : TreeVisitor.java를 타입 검사한 결과는?
+20
+MiniJava 타입 검사: 실패
+In chap5/handcrafted/Main.java
+ - 10: int num_aux;  10번째 줄을 삭제
+21
+$ java Main ../../programs/Factorial.java 
+Undeclared identifier: num_aux
+Undeclared identifier: num_aux
+Undeclared identifier: num_aux
+Return type mismatch in method ComputeFac: 
+expected int, found <unknown>
+Type check failed for ../../programs/Factorial.java
+타입 검사 에러가 발생한 곳의 라인과 
+컬럼 번호를 함께 출력하면 좋을듯!
+MiniJava 타입 검사: 실패
+In chap5/handcrafted/Main.java
+ - 12: 변수명 오타 mum_aux => num_aux
+22
+$ java Main ../../programs/Factorial.java 
+Undeclared identifier: mum_aux
+Type check failed for ../../programs/Factorial.java
+
+MiniJava 타입 검사: 실패
+In chap5/handcrafted/Main.java
+ - 12: 타입 오류 Fac num_aux => int num_aux
+23
+java Main ../../programs/Factorial.java 
+Type mismatch in assignment to num_aux: 
+expected Fac, found int
+Type mismatch in assignment to num_aux: 
+expected Fac, found int
+Return type mismatch in method ComputeFac: 
+expected int, found Fac
+Type check failed for ../../programs/Factorial.java
+
+MiniJava 타입 검사: 실패
+In chap5/handcrafted/Main.java
+ - 12: 변수 중복 선언
+24
+java Main ../../programs/Factorial.java 
+…
+
+MiniJava 타입 검사: 실패
+In chap5/handcrafted/Main.java
+ - 12: 메서드 중복 선언
+25
+java Main ../../programs/Factorial.java 
+…
+
+MiniJava 타입 검사: 실패
+In chap5/handcrafted/Main.java
+ - 20: 클래스 중복 선언
+26
+java Main ../../programs/Factorial.java 
+…
+
+MiniJava 타입 검사
+MiniJava 타입 검사를 위한 심볼 테이블의 바인딩
+ - 변수와 형식 매개변수  -> 타입
+ - 메서드 -> 매개 변수, 반환 타입, 지역 변수 
+ - 클래스 -> 필드 선언, 메서드 선언
+예) 그림 5.7 MiniJava 프로그램 예시와 심볼 테이블
+27
+MiniJava 타입 검사
+28
+
+29
+Special Thaks to 
+조영진!!
+MiniJava 타입 검사
+- 클래스와 메서드 정보
+30
+
+MiniJava 타입 검사
+두 단계 타입 검사기
+ - 1단계 : 추상 구문 트리의 클래스, 멤버 변수, 메소드 선언을 순회, 심볼 테이블을 
+구축
+ - 2단계 : 추상 구문 트리의 모든 문장과 식을 순회하며 타입 검사 수행(구축한 심볼 
+테이블 참조) 
+1,2단계 모두 방문자 패턴으로 구현
+31
+MiniJava 타입 검사
+- TypeVisitor 인터페이스를 구현한 TypeCheckVisitor 클래스
+  : COLLECT와 CHECK 단계를 구분하는 열거형 상수와 phase 변수
+32
+
+MiniJava 타입 검사
+- TypeCheckVisitor.check() 메소드 
+- 에러 처리
+33
+각 accept() 메소드는 
+visit(Program program) 메소드를 호출하여 
+프로그램의 각 요소의 타입을 검사
+“AST 노드.accept()” ⇒ “AST 노드.check()”
+MiniJava 타입 검사
+타입 검사기 1단계
+ - MiniJava 구문 트리를 순회하면서 심볼 테이블을 구축
+34
+
+MiniJava 타입 검사
+타입 검사기 1단계
+ - MiniJava 구문 트리를 순회하면서 심볼 테이블을 구축
+ - Program 5.8의 visit 메서드는 변수 선언에서 심볼 테이블 정보를 구축
+    (변수 선언 처리) 변수의 이름과 타입을 현재 클래스의 자료 구조에 추가
+    (중복 선언 검사) 같은 변수가 중복 선언되었는지 검사 => 오류 메시지 출력
+35
+MiniJava 타입 검사
+타입 검사기 2단계
+ - 1단계에서 구축한 심볼 테이블을 참조하여 모든 문장과 식의 타입을 검사
+36
+각 accept() 메소드는 
+visit(Exp exp) 메소드를 호출하여 
+덧셈의 두 연산자 노드의 타입을 검사
+n.e1.accept() ⇒ n.e1.check() 
+n.e2.accept() ⇒ n.e2.check() 
+MiniJava 타입 검사
+타입 검사기 2단계
+ - 1단계에서 구축한 심볼 테이블을 참조하여 모든 문장과 식의 타입을 검사
+ - 각 visit 메소드의 반환 타입은 (MiniJava의 타입을 표현하는) String
+ - 방문자가 어떤 식을 방문하면, 그 식의 타입을 반환
+ - 그 식이 타입 규칙을 만족하지 않으면, 오류 메시지를 내고 타입 검사를 종료
+37
+MiniJava 타입 검사
+MiniJava 타입 검사 명세
+ - JensPalsberg/miniJava-typesystem.pdf 
+38
+
+MiniJava 타입 검사
+덧셈식 e1 + e2
+ - 두 피연산자가 모두 정수형이어야 함
+ - 이 조건이 만족되면, 덧셈식의 결과 타입은 정수형
+39
+
+명세: 타입 환경 A와 현재 클래스 C에서p1의 타입이 int이고, p2의 타입이 int이면
+동일한 A, C에서  p1 + p2 식의 타입이 int  
+구현: typeCheck (A, C, p1+ p2) => int 
+40
+
+Java 구현: typeCheck (A, C, p1+ p2) => int 
+41
+
+MiniJava 타입 검사
+대입문(assignement) x = e
+ - 왼쪽 x의 타입과 오른쪽 e의 타입이 같은지 검사
+ - 클래스 상속을 허용하는 경우에는 이 조건이 조금 완화됨 
+    : 오른쪽 식의 타입이 왼쪽 타입의 서브타입(subtype)
+42
+
+MiniJava 타입 검사
+대입문(assignement) x = e
+43
+
+MiniJava 타입 검사
+sameType
+44
+
+MiniJava 타입 검사
+isSubtype
+45
+
+MiniJava 타입 검사
+메서드 호출 p.id( e1, … , ek )
+ - 메서드 이름 id를 심볼 테이블에서 찾아 매개변수 목록과 반환 타입을 얻음
+ - p의 타입이 클래스 타입 D라면, 이 클래스 D에서 메서드 id의 정의를 찾음
+ - 메서드의 매개변수 타입들이 호출식에 주어진 인자들과 일치하는지 검사 
+ - 그 메서드의 반환 타입이 전체 메서드 호출식의 타입이 됨
+46
+
+MiniJava 타입 검사
+모든 종류의 문장과 식은 각각의 고유한 타입 검사 규칙을 갖음
+ - 여기서 아직 설명하지 않은 나머지 경우의 규칙들은 Java Language 
+Specification을 참고하여 도출할 수 있음
+  ( https://docs.oracle.com/javase/specs/jls/se21/html/ )
+47
+[실습] MiniJava 타입 검사기
+MiniJava 프로그램을 타입 검사하고, 타입 불일치나 선언되지 않은 식별자에 대해
+적절한 오류 메시지를 출력하는 방문자들 설계하시오.
+48
