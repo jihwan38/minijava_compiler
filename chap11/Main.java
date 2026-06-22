@@ -20,6 +20,16 @@ public class Main {
 
                 if (success) {
                     System.out.println("Successfully type checked for " + path);
+                    
+                    // Chapter 7 IR Tree Translation
+                    visitor.IRTranslator translator = new visitor.IRTranslator();
+                    java.util.List<visitor.IRTranslator.ProcedureIR> procedures = translator.translate(root);
+                    System.out.println("--- Chapter 7 IR Translation Result for " + path + " ---");
+                    Tree.Print printIR = new Tree.Print(System.out);
+                    for (visitor.IRTranslator.ProcedureIR proc : procedures) {
+                        System.out.println("Procedure: " + proc.name);
+                        printIR.prStm(proc.body);
+                    }
                 } else {
                     System.err.println("Type check failed for " + path);
                 }

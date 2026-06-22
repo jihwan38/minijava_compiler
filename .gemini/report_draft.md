@@ -96,7 +96,12 @@
   - **검증 완료:** `FrameDriver` 실행 결과, 4개 이하의 인자와 로컬 변수(foo) 및 5개 이상의 인자가 넘어갈 때의 상황(bar) 각각에 대해 호출 규약(양수/음수 오프셋 배치 및 레지스터 배치)이 완벽하게 들어맞음을 확인했습니다. (출력 로그는 `3.1 [TDD] Mips.FrameDriver 실행 검증 로그` 참조)
 
 ### 📌 2.2 [Translate] IR Tree 변환 모듈 (Chap 7)
-* **설계 의도:** [작성 예정]
+* **설계 의도:**
+  - MiniJava의 AST 노드들을 컴파일러 중간 표현인 Tree IR(문장 `Tree.Stm` 및 식 `Tree.Exp`)로 일대일 번역하는 것을 목표로 합니다.
+  - **클래스 레이아웃 사전 스캔 (`preScanClassLayouts`):** MiniJava는 클래스 멤버 필드 상속을 지원하므로 멤버 변수 오프셋을 구하기 위해서는 부모 클래스의 레이아웃 정보가 필요합니다. 따라서 AST 순회 전에 조상 클래스부터 후손 클래스까지 재귀적(`getOrBuildFields`)으로 순회하며 전체 필드 수집, 오프셋 계산(MIPS 32비트 환경에 대응해 `WORD_SIZE = 4` 단위 정렬) 및 타입 매핑 정보와 메서드 시그니처 리턴 타입을 사전 캐싱하도록 설계했습니다.
+  - **로컬 및 멤버 변수 식별 (`varExp` / `assignVar`):** 변수를 참조하거나 대입할 때, 로컬 스콥(`envStack`)에 매핑된 `Temp`가 있는지 먼저 조사하고, 없으면 현재 클래스 구조의 오프셋 맵(`fieldOffsets`)을 조사하여 이스케이프 여부 및 멤버 변수 위치를 판단, `this` 포인터 기준 메모리 오프셋 `MEM(BINOP(PLUS, TEMP(this), CONST(offset)))`을 동적으로 방출하도록 하였습니다.
+  - **네임스페이스 충돌 회피 (Namespace Isolation):** AST의 식 객체인 `syntaxtree.Exp`와 중간 코드의 식 객체인 `Tree.Exp`, 그리고 AST 출력 `syntaxtree.Print`와 중간 코드 출력 `Tree.Print`가 명칭이 동일하여 컴파일 모호성 에러가 발생했습니다. 이를 회피하기 위해 `import Tree.*` 와일드카드를 걷어내고 개별 임포트를 활용하며, AST 방문 메서드의 파라미터 타입을 FQCN(예: `syntaxtree.Print`)으로 강제 지정하여 컴파일 정합성을 확보했습니다.
+  - **검증 상태:** `programs/QuickSort.java`를 대상으로 메인 드라이버를 실행한 결과, 타입 체킹 통과 직후 각 프로시저(메서드)에 대해 MIPS 호출 규약(implicit `this` 바인딩, arg0-arg3 레지스터 매핑 및 callee-saves 보존 seq)에 부합하는 정규화된 IR Tree가 성공적으로 출력되는 것을 확인하여 기능적 결함이 없음을 입증했습니다.
 
 ### 📌 2.3 [Codegen] 명령어 선택 및 Maximal Munch (Chap 9)
 * **설계 의도:** [작성 예정]
@@ -239,7 +244,7 @@
           public Exp exp; 
           public EXP_stm(Exp e) {exp=e;}
           ...
-            return new EXP_stm(kids.head);
+            return new Tree.EXP_stm(kids.head);
         ```
     - **`chap11/Tree/Exp.java` (구 `Exp1.java` 리네임 및 public 환원, 라인 1)**
       - *Before (Exp1.java)*:
@@ -292,6 +297,201 @@
         ...
         static StmExpList nopNull = new StmExpList(new Tree.EXP_stm(new Tree.CONST(0)),null);
         ```
+
+* **이슈 3: 뼈대 소스코드 StmListList.java 웹 아카이브 마크업 깨짐 버그 해결**
+  - **수정 대상 파일:**
+    - [StmListList.java](file:///c:/Users/user/minijava_compiler/chap11/Canon/StmListList.java) (수정 범위: 전체)
+  - **발생한 컴파일 에러 로그:**
+    ```text
+    chap11\Canon\StmListList.java:93: error: <identifier> expected
+              <span class="iconochive-movies"></span>
+                         ^
+    chap11\Canon\StmListList.java:93: error: class, interface, enum, or record expected
+              <span class="iconochive-movies"></span>
+    ```
+  - **원인 분석:**
+    - Appel 컴파일러 공식 리소스의 Wayback Machine 아카이브 다운로드 중, Wayback Machine의 프레임 삽입 스크립트 및 HTML 배너 마크업이 파일에 고스란히 섞여 다운로드되어 빌드가 완전히 터졌습니다.
+  - **코드 수정 내역 (Before vs After):**
+    - **`chap11/Canon/StmListList.java`**
+      - *Before (전체 HTML 코드)*:
+        ```html
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <title>Wayback Machine</title>
+        ...
+        ```
+      - *After (순수 자바 복원)*:
+        ```java
+        package Canon;
+        
+        public class StmListList {
+          public Tree.StmList head;
+          public StmListList tail;
+          public StmListList(Tree.StmList h, StmListList t) {
+            head = h;
+            tail = t;
+          }
+        }
+        ```
+
+* **이슈 4: 자바 패키지 간 Exp, Print, And 클래스명 충돌 모호성 에러**
+  - **수정 대상 파일:**
+    - [IRTranslator.java](file:///c:/Users/user/minijava_compiler/chap11/visitor/IRTranslator.java) (수정 범위: `import` 문 및 `visit` 메서드 시그니처 전체)
+  - **발생한 컴파일 에러 로그:**
+    ```text
+    chap11\visitor\IRTranslator.java:415: error: reference to Exp is ambiguous
+            Exp cond = resultExp;
+            ^
+      both class Tree.Exp in Tree and class syntaxtree.Exp in syntaxtree match
+    chap11\visitor\IRTranslator.java:429: error: name clash: class IRTranslator has two methods with the same erasure, yet neither overrides the other
+        public void visit(While n) {
+                    ^
+      first method:  visit(Print) in IRTranslator
+      second method: visit(Identifier) in Visitor
+    ```
+  - **원인 분석:**
+    - `syntaxtree` 패키지와 `Tree` 패키지가 둘 다 `Exp`, `Print` 등 동일한 이름의 핵심 클래스를 가지고 있어, `import syntaxtree.*`와 `import Tree.*`를 혼용할 시 타입 명칭의 모호성이 발생하고, `visit` 오버로드가 섀도잉되어 오버라이딩 실패 예외를 유발했습니다.
+  - **코드 수정 내역 (Before vs After):**
+    - **`chap11/visitor/IRTranslator.java`**
+      - *Before*: (와일드카드 임포트 혼용)
+        ```java
+        import syntaxtree.*;
+        import Tree.*;
+        ...
+        public void visit(Print n) {
+        ...
+        public void visit(While n) {
+        ```
+      - *After*: (임포트 제한 및 visit 메서드 파라미터 FQCN 강제화)
+        ```java
+        import syntaxtree.*;
+        import Temp.*;
+        // (import Tree.* 제거 및 Tree 산하 클래스 개별 명시적 import 활용)
+        ...
+        public void visit(syntaxtree.Print n) {
+        ...
+        public void visit(syntaxtree.While n) {
+        ```
+
+* **이슈 5: Graph 패키지 누락으로 인한 레지스터 할당기 컴파일 실패 해결**
+  - **수정 대상 파일:**
+    - [Graph.java](file:///c:/Users/user/minijava_compiler/chap11/Graph/Graph.java) [NEW]
+    - [Node.java](file:///c:/Users/user/minijava_compiler/chap11/Graph/Node.java) [NEW]
+    - [NodeList.java](file:///c:/Users/user/minijava_compiler/chap11/Graph/NodeList.java) [NEW]
+  - **발생한 컴파일 에러 로그:**
+    ```text
+    chap11\RegAlloc\Color.java:3: error: package Graph does not exist
+    import Graph.Node;
+                ^
+    chap11\RegAlloc\Color.java:4: error: package Graph does not exist
+    import Graph.NodeList;
+    ```
+  - **원인 분석:**
+    - 뼈대 코드 이송 시 10단원의 활성 분석에서 필요한 핵심 자료구조인 `Graph` 패키지가 `chap11` 루트에 누락되어 빌드가 불가능했습니다.
+  - **해결 내역:**
+    - `AndrewAppel/chap10/Graph` 아래에 있던 원본 `Graph.java`, `Node.java`, `NodeList.java`를 `chap11/Graph/` 디렉토리에 복사 이송하여 의존성을 복원하고 빌드를 완료했습니다.
+
+---
+
+### 📌 3.2 [TDD] Chap 7 IR 번역 실행 검증 로그 (2026-06-23 완료)
+`programs/QuickSort.java` 파일을 빌드 및 구동하여 AST가 Tree IR 문법 구조에 부합하게 올바른 호출 규약(Arg 레지스터 매핑 및 Callee-saves 보존 seq)으로 정상 변환되는지 최종 실증하였습니다.
+
+**테스트 구동 명령어:**
+```powershell
+javac -encoding UTF-8 -d chap11\bin chap11\syntaxtree\*.java chap11\visitor\*.java chap11\Temp\*.java chap11\Util\*.java chap11\Tree\*.java chap11\Canon\*.java chap11\Mips\*.java chap11\Assem\*.java chap11\FlowGraph\*.java chap11\RegAlloc\*.java chap11\Graph\*.java chap11\*.java
+java -cp chap11\bin Main programs/QuickSort.java
+```
+
+**출력 로그 (일부 발췌 - QS_Init 프로시저):**
+```text
+Procedure: QS_Init
+SEQ(
+ SEQ(
+  SEQ(
+   SEQ(
+    SEQ(
+     SEQ(
+      SEQ(
+       SEQ(
+        SEQ(
+         SEQ(
+          SEQ(
+           MOVE(
+            TEMP t82,
+            TEMP t7),
+           MOVE(
+            TEMP t83,
+            TEMP t8)),
+          MOVE(
+           TEMP t85,
+           TEMP t11)),
+         MOVE(
+          TEMP t86,
+          TEMP t12)),
+        MOVE(
+         TEMP t87,
+         TEMP t13)),
+       MOVE(
+        TEMP t88,
+        TEMP t14)),
+      MOVE(
+       TEMP t89,
+       TEMP t15)),
+     MOVE(
+      TEMP t90,
+      TEMP t16)),
+    MOVE(
+     TEMP t91,
+     TEMP t17)),
+   MOVE(
+    TEMP t92,
+    TEMP t18)),
+  SEQ(
+   SEQ(
+    SEQ(
+     SEQ(
+      SEQ(
+       SEQ(
+        SEQ(
+         SEQ(
+          SEQ(
+           SEQ(
+            SEQ(
+             SEQ(
+              MOVE(
+               MEM(
+                BINOP(PLUS,
+                 TEMP t82,
+                 CONST 4)),
+               TEMP t83),
+              MOVE(
+               MEM(
+                BINOP(PLUS,
+                 TEMP t82,
+                 CONST 0)),
+               ESEQ(
+                MOVE(
+                 TEMP t84,
+                 CALL(
+                  NAME _allocArray,
+                   TEMP t83)),
+                TEMP t84))),
+             MOVE(
+              MEM(
+               BINOP(PLUS,
+                MEM(
+                 BINOP(PLUS,
+                  TEMP t82,
+                  CONST 0)),
+                BINOP(PLUS,
+                 CONST 4,
+                 BINOP(MUL,
+                  CONST 0,
+                  CONST 4)))),
+              CONST 20)),
+...
+```
 
 ---
 
