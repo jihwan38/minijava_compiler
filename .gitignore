@@ -34,3 +34,17 @@ replay_pid*
 # Build directories
 build/
 out/
+bin/
+
+# Custom ignore patterns for backups and metadata
+.gemini/
+backup_*/
+backup_init/
+backup_real/
+ch5/
+chap11/Factorial.s
+chap11/MainCanon.java
+chap11/dumps/
+dumps/
+report_diff.md
+report_final_backup.md
