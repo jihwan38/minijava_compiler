@@ -9,9 +9,8 @@ public class Main {
                 MiniJavaParser parser = new MiniJavaParser(in);
                 Program root = parser.Goal();
                 
-                root.accept(new PrettyPrintVisitor()); 
-                //System.out.println("Successfully parsed for " + path);
-
+                // PrettyPrintVisitor is silenced to avoid polluting assembly output
+                // root.accept(new PrettyPrintVisitor()); 
 
                 TypeCheckVisitor typeChecker = new TypeCheckVisitor();
                 typeChecker.setFileName(new java.io.File(path).getName());
@@ -19,17 +18,49 @@ public class Main {
                 
 
                 if (success) {
-                    System.out.println("Successfully type checked for " + path);
+                    System.err.println("# Successfully type checked for " + path);
                     
                     // Chapter 7 IR Tree Translation
                     visitor.IRTranslator translator = new visitor.IRTranslator();
                     java.util.List<visitor.IRTranslator.ProcedureIR> procedures = translator.translate(root);
-                    System.out.println("--- Chapter 7 IR Translation Result for " + path + " ---");
-                    Tree.Print printIR = new Tree.Print(System.out);
+                    
+                    // Chapter 8 Canon, Chapter 9 Codegen, Chapter 10 & 11 RegAlloc
                     for (visitor.IRTranslator.ProcedureIR proc : procedures) {
-                        System.out.println("Procedure: " + proc.name);
-                        printIR.prStm(proc.body);
+                        Tree.StmList linearized = Canon.Canon.linearize(proc.body);
+                        Canon.BasicBlocks blocks = new Canon.BasicBlocks(linearized);
+                        Canon.TraceSchedule trace = new Canon.TraceSchedule(blocks);
+                        
+                        Codegen.Codegen codegen = new Codegen.Codegen(proc.frame);
+                        Assem.InstrList instrs = codegen.codegen(trace.stms);
+                        
+                        // Chapter 10 procEntryExit2: Add liveness sink
+                        instrs = proc.frame.procEntryExit2(instrs);
+                        
+                        // Chapter 11 Register Allocation
+                        RegAlloc.RegAlloc regAlloc = new RegAlloc.RegAlloc(proc.frame, instrs);
+                        Assem.InstrList allocatedBody = regAlloc.instrs;
+                        
+                        // Chapter 11 procEntryExit3: Prologue / Epilogue wrapping
+                        Mips.Frame.Proc procOutput = proc.frame.procEntryExit3(allocatedBody);
+                        
+                        System.out.println(procOutput.prolog);
+                        for (Assem.InstrList il = procOutput.body; il != null; il = il.tail) {
+                            // Eliminate redundant moves (move $s0, $s0)
+                            if (il.head instanceof Assem.MOVE) {
+                                Assem.MOVE m = (Assem.MOVE) il.head;
+                                String dstName = regAlloc.tempMap(m.dst);
+                                String srcName = regAlloc.tempMap(m.src);
+                                if (dstName != null && dstName.equals(srcName)) {
+                                    continue;
+                                }
+                            }
+                            System.out.print(il.head.format(regAlloc));
+                        }
+                        System.out.println(procOutput.epilog);
                     }
+                    
+                    // Print Runtime Library helper functions at the end
+                    System.out.println(Mips.Frame.standard_library());
                 } else {
                     System.err.println("Type check failed for " + path);
                 }
@@ -37,44 +68,44 @@ public class Main {
                 if (path.endsWith("TestDuplicate.java")) {
                     int errorCount = typeChecker.getErrors().size();
                     if (errorCount == 5) {
-                        System.out.println("TEST PASS: TestDuplicate.java successfully generated exactly 5 errors.");
+                        System.err.println("# TEST PASS: TestDuplicate.java successfully generated exactly 5 errors.");
                     } else {
-                        System.err.println("TEST FAIL: TestDuplicate.java generated " + errorCount + " errors (expected 5).");
+                        System.err.println("# TEST FAIL: TestDuplicate.java generated " + errorCount + " errors (expected 5).");
                     }
                 } else if (path.endsWith("TestUndeclared.java")) {
                     int errorCount = typeChecker.getErrors().size();
                     if (errorCount == 7) {
-                        System.out.println("TEST PASS: TestUndeclared.java successfully generated exactly 7 errors.");
+                        System.err.println("# TEST PASS: TestUndeclared.java successfully generated exactly 7 errors.");
                     } else {
-                        System.err.println("TEST FAIL: TestUndeclared.java generated " + errorCount + " errors (expected 7).");
+                        System.err.println("# TEST FAIL: TestUndeclared.java generated " + errorCount + " errors (expected 7).");
                     }
                 } else if (path.endsWith("TestOverload.java")) {
                     int errorCount = typeChecker.getErrors().size();
                     if (errorCount == 5) {
-                        System.out.println("TEST PASS: TestOverload.java successfully generated exactly 5 errors.");
+                        System.err.println("# TEST PASS: TestOverload.java successfully generated exactly 5 errors.");
                     } else {
-                        System.err.println("TEST FAIL: TestOverload.java generated " + errorCount + " errors (expected 5).");
+                        System.err.println("# TEST FAIL: TestOverload.java generated " + errorCount + " errors (expected 5).");
                     }
                 } else if (path.endsWith("TestAcyclic.java")) {
                     int errorCount = typeChecker.getErrors().size();
                     if (errorCount == 6) {
-                        System.out.println("TEST PASS: TestAcyclic.java successfully generated exactly 6 errors.");
+                        System.err.println("# TEST PASS: TestAcyclic.java successfully generated exactly 6 errors.");
                     } else {
-                        System.err.println("TEST FAIL: TestAcyclic.java generated " + errorCount + " errors (expected 6).");
+                        System.err.println("# TEST FAIL: TestAcyclic.java generated " + errorCount + " errors (expected 6).");
                     }
                 } else if (path.endsWith("TestExprMismatch.java")) {
                     int errorCount = typeChecker.getErrors().size();
                     if (errorCount == 14) {
-                        System.out.println("TEST PASS: TestExprMismatch.java successfully generated exactly 14 errors.");
+                        System.err.println("# TEST PASS: TestExprMismatch.java successfully generated exactly 14 errors.");
                     } else {
-                        System.err.println("TEST FAIL: TestExprMismatch.java generated " + errorCount + " errors (expected 14).");
+                        System.err.println("# TEST FAIL: TestExprMismatch.java generated " + errorCount + " errors (expected 14).");
                     }
                 } else if (path.endsWith("TestStmtMismatch.java")) {
                     int errorCount = typeChecker.getErrors().size();
                     if (errorCount == 7) {
-                        System.out.println("TEST PASS: TestStmtMismatch.java successfully generated exactly 7 errors.");
+                        System.err.println("# TEST PASS: TestStmtMismatch.java successfully generated exactly 7 errors.");
                     } else {
-                        System.err.println("TEST FAIL: TestStmtMismatch.java generated " + errorCount + " errors (expected 7).");
+                        System.err.println("# TEST FAIL: TestStmtMismatch.java generated " + errorCount + " errors (expected 7).");
                     }
                 }
             } catch (ParseException e) {
@@ -86,3 +117,4 @@ public class Main {
         }
     }
 }
+

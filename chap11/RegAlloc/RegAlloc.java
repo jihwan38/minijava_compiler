@@ -8,6 +8,7 @@ import Temp.Temp;
 import Temp.TempList;
 import Temp.TempMap;
 import Temp.LabelList;
+import Temp.Label;
 import Mips.Frame;
 import Mips.Access;
 import Mips.InFrame;
@@ -25,7 +26,7 @@ import java.util.Set;
 
 /**
  * Register allocator front-end: builds interference, invokes Color.
- * Simplified: support spills
+ * Supports spilling and maps aliased variables to shared stack offsets.
  */
 public class RegAlloc implements TempMap {
   public InstrList instrs;
@@ -46,7 +47,10 @@ public class RegAlloc implements TempMap {
       Liveness live = new Liveness(fg);
       InterferenceGraph ig = live.interferenceGraph();
 
-      Color color = new Color(ig, Frame.regNameMap(), regs);
+      // Compute loop-aware spill weights
+      Map<Temp, Double> weights = computeSpillWeights(current);
+
+      Color color = new Color(ig, Frame.regNameMap(), regs, weights);
       TempList roundSpills = color.spills();
 
       if (roundSpills == null) {
@@ -55,7 +59,7 @@ public class RegAlloc implements TempMap {
         break;
       }
 
-      current = rewriteForSpills(f, current, roundSpills);
+      current = rewriteForSpills(f, current, roundSpills, color);
       finalMap = color;
       finalSpills = roundSpills;
     }
@@ -92,9 +96,70 @@ public class RegAlloc implements TempMap {
     return regs;
   }
 
-  private InstrList rewriteForSpills(Frame f, InstrList body, TempList spilled) {
+  private Map<Temp, Double> computeSpillWeights(InstrList instrs) {
+    List<Assem.Instr> list = new ArrayList<>();
+    for (InstrList p = instrs; p != null; p = p.tail) {
+      list.add(p.head);
+    }
+
+    Map<Label, Integer> labelIndices = new HashMap<>();
+    for (int i = 0; i < list.size(); i++) {
+      Assem.Instr ins = list.get(i);
+      if (ins instanceof LABEL) {
+        labelIndices.put(((LABEL) ins).label, i);
+      }
+    }
+
+    List<int[]> loops = new ArrayList<>();
+    for (int i = 0; i < list.size(); i++) {
+      Assem.Instr ins = list.get(i);
+      Targets jt = ins.jumps();
+      if (jt != null && jt.labels != null) {
+        for (LabelList ll = jt.labels; ll != null; ll = ll.tail) {
+          Label lbl = ll.head;
+          if (labelIndices.containsKey(lbl)) {
+            int targetIdx = labelIndices.get(lbl);
+            if (targetIdx < i) {
+              loops.add(new int[]{targetIdx, i});
+            }
+          }
+        }
+      }
+    }
+
+    int[] depth = new int[list.size()];
+    for (int i = 0; i < list.size(); i++) {
+      int d = 0;
+      for (int[] loop : loops) {
+        if (i >= loop[0] && i <= loop[1]) {
+          d++;
+        }
+      }
+      depth[i] = d;
+    }
+
+    Map<Temp, Double> weights = new HashMap<>();
+    for (int i = 0; i < list.size(); i++) {
+      Assem.Instr ins = list.get(i);
+      int d = depth[i];
+      double occurrenceWeight = (d == 0) ? 1.0 : 10.0 * d;
+
+      TempList defs = ins.def();
+      for (TempList p = defs; p != null; p = p.tail) {
+        weights.put(p.head, weights.getOrDefault(p.head, 0.0) + occurrenceWeight);
+      }
+      TempList uses = ins.use();
+      for (TempList p = uses; p != null; p = p.tail) {
+        weights.put(p.head, weights.getOrDefault(p.head, 0.0) + occurrenceWeight);
+      }
+    }
+
+    return weights;
+  }
+
+  private InstrList rewriteForSpills(Frame f, InstrList body, TempList spilled, Color color) {
     Set<Temp> spilledSet = toSet(spilled);
-    ensureSpillSlots(f, spilledSet);
+    ensureSpillSlots(f, spilledSet, color);
 
     List<Assem.Instr> rewritten = new ArrayList<>();
     for (InstrList p = body; p != null; p = p.tail) {
@@ -203,27 +268,29 @@ public class RegAlloc implements TempMap {
 
   private OPER loadFromSpill(Temp spilledTemp, Temp into) {
     int off = spillOffsets.get(spilledTemp);
-    return new OPER("lw `d0, " + off + "(`s0)",
+    return new OPER("lw `d0, " + off + "(`s0)\n",
         new TempList(into, null),
         new TempList(Frame.FP, null));
   }
 
   private OPER storeToSpill(Temp spilledTemp, Temp from) {
     int off = spillOffsets.get(spilledTemp);
-    return new OPER("sw `s0, " + off + "(`s1)",
+    return new OPER("sw `s0, " + off + "(`s1)\n",
         null,
         new TempList(from, new TempList(Frame.FP, null)));
   }
 
-  private void ensureSpillSlots(Frame f, Set<Temp> spilledSet) {
+  private void ensureSpillSlots(Frame f, Set<Temp> spilledSet, Color color) {
     for (Temp t : spilledSet) {
-      if (!spillOffsets.containsKey(t)) {
+      Temp aliasT = color.getAliasTemp(t);
+      if (!spillOffsets.containsKey(aliasT)) {
         Access a = f.allocLocal(true);
         if (!(a instanceof InFrame)) {
           throw new RuntimeException("Expected InFrame for spilled temp");
         }
-        spillOffsets.put(t, ((InFrame) a).offset);
+        spillOffsets.put(aliasT, ((InFrame) a).offset);
       }
+      spillOffsets.put(t, spillOffsets.get(aliasT));
     }
   }
 
