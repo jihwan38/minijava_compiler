@@ -1,0 +1,344 @@
+================================================================================
+REFERENCE: Translate & IRTranslator (Chapter 7)
+================================================================================
+
+This reference compiles the complete structure and implementation details of the
+IRTranslator class (implements Visitor) extracted from the Chapter 7 lecture slides.
+
+--------------------------------------------------------------------------------
+1. Class Fields & State Management (Slide p.39)
+--------------------------------------------------------------------------------
+public class IRTranslator implements Visitor {
+    private final Deque<HashMap<String, Temp>> envStack = new ArrayDeque<>();
+    private final Deque<HashMap<String, String>> typeEnvStack = new ArrayDeque<>();
+    private Stm resultStm; // last statement result
+    private Exp resultExp; // last expression result
+    private final ArrayList<ProcedureIR> procedures = new ArrayList<>();
+    private final HashMap<String, ArrayList<String>> classFields = new HashMap<>();
+    private final HashMap<String, HashMap<String, Integer>> fieldOffsets = new HashMap<>();
+    private final HashMap<String, HashMap<String, String>> classOwnFieldTypes = new HashMap<>();
+    private final HashMap<String, HashMap<String, String>> classAllFieldTypes = new HashMap<>();
+    private final HashMap<String, String> classParents = new HashMap<>();
+    private final HashMap<String, ArrayList<String>> classOwnFields = new HashMap<>();
+    private static final int WORD_SIZE = 4;
+    private String currentClassName = null;
+    public static boolean DEBUG = false;
+    
+    // Environment helper methods (not explicitly in slides but required):
+    private HashMap<String, Temp> env() { return envStack.peek(); }
+    private HashMap<String, String> typeEnv() { return typeEnvStack.peek(); }
+    private void envPush() {
+        envStack.push(envStack.isEmpty() ? new HashMap<>() : new HashMap<>(envStack.peek()));
+        typeEnvStack.push(typeEnvStack.isEmpty() ? new HashMap<>() : new HashMap<>(typeEnvStack.peek()));
+    }
+    private void envPop() {
+        envStack.pop();
+        typeEnvStack.pop();
+    }
+    
+    private Temp tempOf(String name) {
+        Temp t = env().get(name);
+        if (t == null) {
+            t = new Temp();
+            env().put(name, t);
+        }
+        return t;
+    }
+    // ... Additional type resolvers and helpers are omitted here.
+}
+
+--------------------------------------------------------------------------------
+2. ProcedureIR and translate Entrypoint (Slide p.43)
+--------------------------------------------------------------------------------
+public static class ProcedureIR {
+    public final String name;
+    public final Frame frame;
+    public final Stm body;
+    
+    public ProcedureIR(String name, Frame frame, Stm body) {
+        this.name = name;
+        this.frame = frame;
+        this.body = body;
+    }
+}
+
+public List<ProcedureIR> translate(syntaxtree.Program root) {
+    procedures.clear();
+    envPush();
+    root.accept(this);
+    envPop();
+    return new ArrayList<>(procedures);
+}
+
+--------------------------------------------------------------------------------
+3. Program & Class Decl Visitors (Slide p.44, 45, 46, 47)
+--------------------------------------------------------------------------------
+// Program (p.44)
+public void visit(syntaxtree.Program n) {
+    preScanClassLayouts(n); // scan parent relations, field offsets, field types
+    n.m.accept(this);
+    for (int i = 0; i < n.cl.size(); i++) {
+        n.cl.elementAt(i).accept(this);
+    }
+}
+
+// MainClass (p.45)
+public void visit(syntaxtree.MainClass n) {
+    envPush();
+    List<Stm> stms = new ArrayList<>();
+    n.s.accept(this);
+    if (resultStm != null) stms.add(resultStm);
+    
+    Frame frame = new Frame("main", null);
+    resultStm = frame.procEntryExit1(maybeSeq(stms));
+    procedures.add(new ProcedureIR("main", frame, resultStm));
+    envPop();
+}
+
+// ClassDeclSimple (p.46)
+public void visit(syntaxtree.ClassDeclSimple n) {
+    String savedClass = currentClassName;
+    currentClassName = n.i.s;
+    
+    ArrayList<String> fields = new ArrayList<>();
+    for (int i = 0; i < n.vl.size(); i++) {
+        fields.add(n.vl.elementAt(i).i.s);
+    }
+    classFields.put(n.i.s, fields);
+    
+    HashMap<String, Integer> offsets = new HashMap<>();
+    for (int i = 0; i < fields.size(); i++) {
+        offsets.put(fields.get(i), i * WORD_SIZE);
+    }
+    fieldOffsets.put(n.i.s, offsets);
+    
+    for (int i = 0; i < n.ml.size(); i++) {
+        n.ml.elementAt(i).accept(this);
+    }
+    currentClassName = savedClass;
+}
+
+// ClassDeclExtends (p.47)
+public void visit(syntaxtree.ClassDeclExtends n) {
+    String savedClass = currentClassName;
+    currentClassName = n.i.s;
+    
+    ArrayList<String> fields = new ArrayList<>();
+    for (int i = 0; i < n.vl.size(); i++) {
+        fields.add(n.vl.elementAt(i).i.s);
+    }
+    
+    ArrayList<String> parentFields = classFields.getOrDefault(n.j.s, new ArrayList<>());
+    ArrayList<String> allFields = new ArrayList<>(parentFields);
+    allFields.addAll(fields);
+    classFields.put(n.i.s, allFields);
+    
+    HashMap<String, Integer> offsets = new HashMap<>();
+    for (int i = 0; i < allFields.size(); i++) {
+        offsets.put(allFields.get(i), i * WORD_SIZE);
+    }
+    fieldOffsets.put(n.i.s, offsets);
+    
+    for (int i = 0; i < n.ml.size(); i++) {
+        n.ml.elementAt(i).accept(this);
+    }
+    currentClassName = savedClass;
+}
+
+--------------------------------------------------------------------------------
+4. Method Decl Visitor & Formal Binding (Slide p.48, 49, 50, 51)
+--------------------------------------------------------------------------------
+public void visit(syntaxtree.MethodDecl n) {
+    envPush();
+    BoolList escapes = null;
+    // Build escape list for formal parameters. MIPS conventions:
+    // implicit 'this' + actual formals
+    for (int j = n.fl.size(); j >= 0; j--) {
+        escapes = new BoolList(false, escapes);
+    }
+    
+    String mlabel = methodLabel(currentClassName, n.i.s);
+    Frame frame = new Frame(mlabel, escapes);
+    List<Stm> stms = new ArrayList<>();
+    List<Access> formals = frame.getFormals();
+    int formalIndex = 0;
+    
+    // 1. Implicit 'this' parameter binding (p.48, 49)
+    Access thisAcc = formals.get(formalIndex++);
+    if (thisAcc instanceof InFrame) {
+        env().put("this", new Temp()); // or handle frame offset
+    } else if (thisAcc instanceof InReg) {
+        env().put("this", ((InReg) thisAcc).temp);
+    }
+    typeEnv().put("this", currentClassName);
+    
+    // 2. Formal parameters binding (p.49)
+    for (int j = 0; j < n.fl.size(); j++) {
+        String name = n.fl.elementAt(j).i.s;
+        Access acc = formals.get(formalIndex++);
+        if (acc instanceof InFrame) {
+            env().put(name, new Temp());
+        } else if (acc instanceof InReg) {
+            env().put(name, ((InReg) acc).temp);
+        }
+        typeEnv().put(name, typeNameOf(n.fl.elementAt(j).t));
+    }
+    
+    // 3. Local variables allocation (p.50)
+    for (int j = 0; j < n.vl.size(); j++) {
+        syntaxtree.VarDecl vd = n.vl.elementAt(j);
+        tempOf(vd.i.s);
+        typeEnv().put(vd.i.s, typeNameOf(vd.t));
+    }
+    
+    // 4. Method body statements (p.50)
+    for (int i = 0; i < n.sl.size(); i++) {
+        n.sl.elementAt(i).accept(this);
+        if (resultStm != null) stms.add(resultStm);
+    }
+    
+    // 5. Method return value (p.50)
+    n.e.accept(this);
+    Exp ret = resultExp;
+    stms.add(new MOVE(new TEMP(Frame.RV), ret));
+    
+    // 6. View shift & Callee-saves encapsulation
+    resultStm = frame.procEntryExit1(maybeSeq(stms));
+    procedures.add(new ProcedureIR(mlabel, frame, resultStm));
+    envPop();
+}
+
+--------------------------------------------------------------------------------
+5. Statement & Expression Visitors (Slide p.52 - 58)
+--------------------------------------------------------------------------------
+// Print (p.52)
+public void visit(syntaxtree.Print n) {
+    n.e.accept(this);
+    Exp e = resultExp;
+    resultStm = print1(e); // Helper method to generate library call to print integer
+}
+
+// Assign (p.52)
+public void visit(syntaxtree.Assign n) {
+    n.e.accept(this);
+    Exp rhs = resultExp;
+    resultStm = assignVar(n.i.s, rhs);
+}
+
+// ArrayAssign (p.52) -> e1[e2] = val
+public void visit(syntaxtree.ArrayAssign n) {
+    n.e1.accept(this);
+    Exp idx = resultExp;
+    n.e2.accept(this);
+    Exp val = resultExp;
+    Exp base = varExp(n.i.s);
+    Exp addr = bin(BINOP.PLUS, base, bin(BINOP.PLUS, new CONST(4), bin(BINOP.MUL, idx, new CONST(4))));
+    resultStm = new MOVE(new MEM(addr), val);
+}
+
+// If (p.53)
+public void visit(syntaxtree.If n) {
+    n.e.accept(this);
+    Exp cond = resultExp;
+    Label lt = new Label();
+    Label lf = new Label();
+    Label le = new Label();
+    
+    CJUMP c = new CJUMP(CJUMP.NE, cond, const0(), lt, lf);
+    n.s1.accept(this);
+    Stm s1 = resultStm;
+    n.s2.accept(this);
+    Stm s2 = resultStm;
+    resultStm = seq(c, new LABEL(lt), s1, new JUMP(le), new LABEL(lf), s2, new LABEL(le));
+}
+
+// And (p.55)
+public void visit(syntaxtree.And n) {
+    n.e1.accept(this);
+    Exp a = resultExp;
+    n.e2.accept(this);
+    Exp b = resultExp;
+    resultExp = bin(BINOP.AND, a, b);
+}
+
+// LessThan (p.55) -> e1 < e2
+public void visit(syntaxtree.LessThan n) {
+    n.e1.accept(this);
+    Exp a = resultExp;
+    n.e2.accept(this);
+    Exp b = resultExp;
+    Temp t = new Temp();
+    Label lt = new Label();
+    Label lf = new Label();
+    Label le = new Label();
+    
+    Stm s = seq(
+        new MOVE(new TEMP(t), const0()),
+        new CJUMP(CJUMP.LT, a, b, lt, lf),
+        new LABEL(lt), new MOVE(new TEMP(t), const1()),
+        new JUMP(le),
+        new LABEL(lf),
+        new LABEL(le)
+    );
+    resultExp = new ESEQ(s, new TEMP(t));
+}
+
+// ArrayLookup (p.56) -> e1[e2]
+public void visit(syntaxtree.ArrayLookup n) {
+    n.e1.accept(this);
+    Exp base = resultExp;
+    n.e2.accept(this);
+    Exp idx = resultExp;
+    Exp addr = bin(BINOP.PLUS, base, bin(BINOP.PLUS, new CONST(4), bin(BINOP.MUL, idx, new CONST(4))));
+    resultExp = new MEM(addr);
+}
+
+// ArrayLength (p.56)
+public void visit(syntaxtree.ArrayLength n) {
+    n.e.accept(this);
+    Exp arr = resultExp;
+    resultExp = new MEM(arr); // length is stored at base offset 0
+}
+
+// Call (p.57) -> receiver.method(args...)
+public void visit(syntaxtree.Call n) {
+    String recvClass = receiverClassOf(n.e);
+    n.e.accept(this);
+    Exp recv = resultExp;
+    
+    ExpList args = new ExpList(recv, null);
+    for (int i = 0; i < n.el.size(); i++) {
+        n.el.elementAt(i).accept(this);
+        args = append(args, resultExp);
+    }
+    
+    String callName = (recvClass != null) ? methodLabel(recvClass, n.i.s) : n.i.s;
+    resultExp = new CALL(new NAME(new Label(callName)), args);
+}
+
+// NewArray (p.58)
+public void visit(syntaxtree.NewArray n) {
+    n.e.accept(this);
+    Exp size = resultExp;
+    Temp t = new Temp();
+    Stm s = new MOVE(new TEMP(t), new CALL(new NAME(new Label(Frame.allocArrayLabel())), new ExpList(size, null)));
+    resultExp = new ESEQ(s, new TEMP(t));
+}
+
+// NewObject (p.58)
+public void visit(syntaxtree.NewObject n) {
+    String cname = n.i.s;
+    int fcount = classFields.getOrDefault(cname, new ArrayList<>()).size();
+    int sizeBytes = fcount * WORD_SIZE;
+    Temp t = new Temp();
+    List<Stm> inits = new ArrayList<>();
+    
+    // Allocate space from heap
+    inits.add(new MOVE(new TEMP(t), new CALL(new NAME(new Label(Frame.heapAllocLabel())), new ExpList(new CONST(sizeBytes), null))));
+    // Zero-initialize fields
+    for (int i = 0; i < fcount; i++) {
+        int off = i * WORD_SIZE;
+        inits.add(new MOVE(new MEM(bin(BINOP.PLUS, new TEMP(t), new CONST(off))), const0()));
+    }
+    resultExp = new ESEQ(seq(inits), new TEMP(t));
+}

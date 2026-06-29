@@ -1,0 +1,61 @@
+================================================================================
+REFERENCE: Liveness Analysis & Register Allocation (Chapter 10 & 11)
+================================================================================
+
+This reference outlines the liveness analysis control flow, register allocation
+algorithms, and specifically analyzes the provided Color/RegAlloc files.
+It also outlines the strategic implementation path to receive the +5 bonus points.
+
+--------------------------------------------------------------------------------
+1. Provided Files Analysis
+--------------------------------------------------------------------------------
+The provided `RegAlloc_FlowGraph` folder contains:
+* FlowGraph/AssemFlowGraph.java: Constructs a CFG from assembly instruction lists.
+* FlowGraph/Liveness.java: Performs liveness fixed-point dataflow calculations 
+  (in = use U (out - def)) and constructs the InterferenceGraph.
+* RegAlloc/InterferenceGraph.java: Abstract interface representing interference.
+* RegAlloc/Color.java: Solves graph coloring using a simplified simplify-select approach.
+* RegAlloc/RegAlloc.java: Top-level driver driving liveness analysis, coloring,
+  and rewriting assembly instructions to spill temps onto the stack.
+
+--------------------------------------------------------------------------------
+2. Color.java Logic (Simplification & Select)
+--------------------------------------------------------------------------------
+* Degree Map: Constructed using undirected node adjacencies.
+* Precolored: Predefined registers ($zero, $t0-$t9, $s0-$s7, $a0-$a3, $v0, $v1, $ra) 
+  are initialized with fixed color mappings from Mips.Frame.
+* Simplify (p.84): Non-precolored nodes with degree < K are added to simplifyWorklist.
+  They are popped and pushed to a stack.
+* Potential Spill (p.90): If simplifyWorklist is empty but uncolored nodes remain,
+  a node is selected as a "potential spill" candidate, pushed to the stack, 
+  and removed from the graph to continue simplification (Optimistic Coloring).
+* Select: Nodes are popped from the stack and colored with available physical
+  registers that do not clash with neighbors. If no color is available, the node is spilled.
+
+--------------------------------------------------------------------------------
+3. ⭐ Strategy for receiving the +5 Bonus Points (Register Allocation)
+--------------------------------------------------------------------------------
+The project specifications state:
+"제공된 레지스터 할당 소스를 그대로 사용하는 경우는 원점수는 받지만 가점에 해당하지는 않습니다."
+(Using the provided register allocation source as-is yields base points but no bonus points.)
+
+To successfully claim the +5 bonus points, we must customize and enhance the allocator
+rather than keeping it completely unchanged.
+
+PROPOSED ENHANCEMENT: Loop-aware Spill Weight Heuristics (Chapter 11, Slide p.32)
+* The default Color.java implementation selects a potential spill node arbitrarily (the first encountered node):
+  ```java
+  for (Node n : allNodes) {
+      if (!removed.contains(n) && !precolored.contains(n)) {
+          pick = n;
+          break;
+      }
+  }
+  ```
+* We will improve this by implementing a **Loop-Aware Spill Priority Heuristic** as described on Slide 32:
+  Spill Priority = (def/use count outside loops + 10 * def/use count inside loops) / degree
+* Implementation Details:
+  - Analyze the instruction list to detect loops (or estimate frequency based on jump instruction layout).
+  - Count def/use occurrences for each Temp.
+  - Choose the node with the **lowest** spill priority to spill first, preserving heavily-used temps in registers.
+  - This significantly improves compiler code quality and serves as a strong justification of "direct implementation of register allocation optimization" for the bonus points report.
