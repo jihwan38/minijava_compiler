@@ -15,6 +15,8 @@ public class IRTranslator implements Visitor {
     private final HashMap<String, HashMap<String, String>> classAllFieldTypes = new HashMap<>();
     private final HashMap<String, String> classParents = new HashMap<>();
     private final HashMap<String, HashMap<String, String>> classMethodTypes = new HashMap<>();
+    private final HashMap<String, syntaxtree.ClassDecl> classDecls = new HashMap<>();
+    private final HashMap<String, Integer> classTags = new HashMap<>();
     private static final int WORD_SIZE = 4;
     private String currentClassName = null;
     public static boolean DEBUG = false;
@@ -111,7 +113,7 @@ public class IRTranslator implements Visitor {
 
         HashMap<String, Integer> offsets = new HashMap<>();
         for (int i = 0; i < fields.size(); i++) {
-            offsets.put(fields.get(i), i * WORD_SIZE);
+            offsets.put(fields.get(i), (i + 1) * WORD_SIZE);
         }
         fieldOffsets.put(cname, offsets);
 
@@ -119,7 +121,8 @@ public class IRTranslator implements Visitor {
     }
 
     private void preScanClassLayouts(syntaxtree.Program n) {
-        HashMap<String, syntaxtree.ClassDecl> classDecls = new HashMap<>();
+        classDecls.clear();
+        classTags.clear();
 
         for (int i = 0; i < n.cl.size(); i++) {
             syntaxtree.ClassDecl cd = n.cl.elementAt(i);
@@ -133,6 +136,11 @@ public class IRTranslator implements Visitor {
             if (cname != null) {
                 classDecls.put(cname, cd);
             }
+        }
+
+        int tag = 1;
+        for (String cname : classDecls.keySet()) {
+            classTags.put(cname, tag++);
         }
 
         for (String cname : classDecls.keySet()) {
@@ -260,13 +268,54 @@ public class IRTranslator implements Visitor {
         return list;
     }
 
+    private boolean isSubclassOf(String cname, String parent) {
+        String current = cname;
+        while (current != null) {
+            if (current.equals(parent)) return true;
+            current = classParents.get(current);
+        }
+        return false;
+    }
+
+    private String findMethodDeclarer(String cname, String mname, HashMap<String, syntaxtree.ClassDecl> classDecls) {
+        String current = cname;
+        while (current != null) {
+            syntaxtree.ClassDecl cd = classDecls.get(current);
+            if (cd != null) {
+                syntaxtree.MethodDeclList mdl = null;
+                if (cd instanceof syntaxtree.ClassDeclSimple) {
+                    mdl = ((syntaxtree.ClassDeclSimple) cd).ml;
+                } else if (cd instanceof syntaxtree.ClassDeclExtends) {
+                    mdl = ((syntaxtree.ClassDeclExtends) cd).ml;
+                }
+                if (mdl != null) {
+                    for (int i = 0; i < mdl.size(); i++) {
+                        if (mdl.elementAt(i).i.s.equals(mname)) {
+                            return current;
+                        }
+                    }
+                }
+            }
+            current = classParents.get(current);
+        }
+        return null;
+    }
+
     private String receiverClassOf(syntaxtree.Exp recv) {
         if (recv instanceof syntaxtree.This) {
             return currentClassName;
         } else if (recv instanceof syntaxtree.NewObject) {
             return ((syntaxtree.NewObject) recv).i.s;
         } else if (recv instanceof syntaxtree.IdentifierExp) {
-            return typeEnv().get(((syntaxtree.IdentifierExp) recv).s);
+            String name = ((syntaxtree.IdentifierExp) recv).s;
+            String type = typeEnv().get(name);
+            if (type == null && currentClassName != null) {
+                HashMap<String, String> fields = classAllFieldTypes.get(currentClassName);
+                if (fields != null) {
+                    type = fields.get(name);
+                }
+            }
+            return type;
         } else if (recv instanceof syntaxtree.Call) {
             syntaxtree.Call call = (syntaxtree.Call) recv;
             String rc = receiverClassOf(call.e);
@@ -547,8 +596,58 @@ public class IRTranslator implements Visitor {
             args = append(args, resultExp);
         }
 
-        String callName = (recvClass != null) ? methodLabel(recvClass, n.i.s) : n.i.s;
-        resultExp = new Tree.CALL(new Tree.NAME(new Label(callName)), args);
+        if (recvClass != null) {
+            Map<String, String> resolvedLabels = new HashMap<>();
+            for (String cname : classTags.keySet()) {
+                if (isSubclassOf(cname, recvClass)) {
+                    String declarer = findMethodDeclarer(cname, n.i.s, classDecls);
+                    if (declarer != null) {
+                        resolvedLabels.put(cname, methodLabel(declarer, n.i.s));
+                    }
+                }
+            }
+
+            Set<String> uniqueLabels = new HashSet<>(resolvedLabels.values());
+            if (uniqueLabels.size() <= 1) {
+                String callLabel = uniqueLabels.isEmpty() ? methodLabel(recvClass, n.i.s) : uniqueLabels.iterator().next();
+                resultExp = new Tree.CALL(new Tree.NAME(new Label(callLabel)), args);
+            } else {
+                Temp tRecv = new Temp();
+                Tree.Stm saveRecv = new Tree.MOVE(new Tree.TEMP(tRecv), recv);
+                Temp tTag = new Temp();
+                Tree.Stm loadTag = new Tree.MOVE(new Tree.TEMP(tTag), new Tree.MEM(new Tree.TEMP(tRecv)));
+                Temp tRet = new Temp();
+                Label lEnd = new Label();
+                
+                List<Tree.Stm> stms = new ArrayList<>();
+                stms.add(saveRecv);
+                stms.add(loadTag);
+                
+                for (Map.Entry<String, String> entry : resolvedLabels.entrySet()) {
+                    String cname = entry.getKey();
+                    String label = entry.getValue();
+                    int tag = classTags.get(cname);
+                    
+                    Label lMatch = new Label();
+                    Label lNext = new Label();
+                    
+                    stms.add(new Tree.CJUMP(Tree.CJUMP.EQ, new Tree.TEMP(tTag), new Tree.CONST(tag), lMatch, lNext));
+                    stms.add(new Tree.LABEL(lMatch));
+                    Tree.ExpList dispatchArgs = new Tree.ExpList(new Tree.TEMP(tRecv), args.tail);
+                    stms.add(new Tree.MOVE(new Tree.TEMP(tRet), new Tree.CALL(new Tree.NAME(new Label(label)), dispatchArgs)));
+                    stms.add(new Tree.JUMP(lEnd));
+                    stms.add(new Tree.LABEL(lNext));
+                }
+                
+                Tree.ExpList dispatchArgs = new Tree.ExpList(new Tree.TEMP(tRecv), args.tail);
+                stms.add(new Tree.MOVE(new Tree.TEMP(tRet), new Tree.CALL(new Tree.NAME(new Label(methodLabel(recvClass, n.i.s))), dispatchArgs)));
+                stms.add(new Tree.LABEL(lEnd));
+                
+                resultExp = new Tree.ESEQ(seq(stms), new Tree.TEMP(tRet));
+            }
+        } else {
+            resultExp = new Tree.CALL(new Tree.NAME(new Label(n.i.s)), args);
+        }
     }
 
     public void visit(syntaxtree.IntegerLiteral n) {
@@ -582,14 +681,17 @@ public class IRTranslator implements Visitor {
     public void visit(syntaxtree.NewObject n) {
         String cname = n.i.s;
         int fcount = classFields.getOrDefault(cname, new ArrayList<>()).size();
-        int sizeBytes = fcount * WORD_SIZE;
+        int sizeBytes = (fcount + 1) * WORD_SIZE;
         Temp t = new Temp();
         List<Tree.Stm> inits = new ArrayList<>();
 
         inits.add(new Tree.MOVE(new Tree.TEMP(t), new Tree.CALL(new Tree.NAME(new Label(Mips.Frame.heapAllocLabel())), new Tree.ExpList(new Tree.CONST(sizeBytes), null))));
 
+        int tag = classTags.getOrDefault(cname, 0);
+        inits.add(new Tree.MOVE(new Tree.MEM(new Tree.TEMP(t)), new Tree.CONST(tag)));
+
         for (int i = 0; i < fcount; i++) {
-            int off = i * WORD_SIZE;
+            int off = (i + 1) * WORD_SIZE;
             inits.add(new Tree.MOVE(new Tree.MEM(bin(Tree.BINOP.PLUS, new Tree.TEMP(t), new Tree.CONST(off))), const0()));
         }
 
